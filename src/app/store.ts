@@ -1,7 +1,33 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, Middleware } from '@reduxjs/toolkit';
+import { wsMiddleware } from '../shared/middleware/wsMiddleware';
+
+// Placeholder slice reducers matching ARCHITECTURE.md data models
+const createEmptySlice = (name: string) => ({
+  name,
+  reducer: (state = {} as const) => state,
+});
+
+const authSlice = createEmptySlice('auth');
+const ticketsSlice = createEmptySlice('tickets');
+const desktopSlice = createEmptySlice('desktop');
+const communicationSlice = createEmptySlice('communication');
+const scoringSlice = createEmptySlice('scoring');
+const teamSlice = createEmptySlice('team');
+const certificatesSlice = createEmptySlice('certificates');
+const layoutSlice = createEmptySlice('layout');
 
 export const store = configureStore({
-  reducer: {},
+  reducer: {
+    auth: authSlice.reducer,
+    tickets: ticketsSlice.reducer,
+    desktop: desktopSlice.reducer,
+    communication: communicationSlice.reducer,
+    scoring: scoringSlice.reducer,
+    team: teamSlice.reducer,
+    certificates: certificatesSlice.reducer,
+    layout: layoutSlice.reducer,
+  },
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(wsMiddleware),
   devTools: true,
 });
 

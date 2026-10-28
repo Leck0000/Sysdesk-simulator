@@ -8,19 +8,16 @@
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "strict": true,
+    "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
-    "downlevelIter": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "references": [
     { "path": "./tsconfig.node.json" }
   ]
