@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: Lint → Typecheck → Unit → Build → E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '>=20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Playwright browsers
+        run: pnpm playwright install --with-deps
+
+      - name: Start dev server
+        run: pnpm exec vite preview --port 3000 --host 0.0.0.0 &>/dev/null &
+        working-dir: .
+        env:
+          VITE_PORT: 3000
+        # Wait for dev server to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:3000/ > /dev/null 2>&1; then
+              echo "Dev server is ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: E2E tests
+        run: pnpm playwright test
+        env:
+          CI: true
