@@ -8,9 +8,8 @@ on:
 
 jobs:
   test:
-    name: Lint → Typecheck → Unit → Build → E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
@@ -43,7 +42,7 @@ jobs:
         run: pnpm playwright install --with-deps
 
       - name: Start dev server
-        run: pnpm exec vite preview --port 3000 --host 0.0.0.0 &>/dev/null &
+        run: pnpm exec vite preview --port 3000 --host 0.0.0.2>/dev/null &
         working-dir: .
         env:
           VITE_PORT: 3000

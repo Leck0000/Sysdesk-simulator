@@ -1,3 +1,19 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Responsive breakpoints */
+@media (min-width: 1280px) {
+  .sidebar {
+    width: 256px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .drawer-mode .sidebar {
+    transform: translateX(-256px);
+  }
+  .sidebar.drawer-open {
+    transform: translateX(0);
+  }
+}

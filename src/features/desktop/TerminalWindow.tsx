@@ -1,7 +1,7 @@
 /*****
  * TerminalWindow — Window chrome + Terminal component
  *
- * Consumes: 
+ * Consumes:
  *   - wsClient (send_command, receive command_output) via wsMiddleware
  *   - desktopSlice (windowId → machineId mapping)
  *
@@ -19,12 +19,7 @@ import type { RootState } from '../../app/store';
 import { z } from 'zod';
 
 // Import ws actions and types
-import {
-  wsSend,
-  createSendCommand,
-  ClientEventType,
-  isClientEventType,
-} from '../../shared/ws';
+import { wsSend, createSendCommand, ClientEventType } from '../../shared/ws';
 import { desktopSlice } from './slice';
 
 // Type-safe terminal dimensions
@@ -44,9 +39,7 @@ const terminalThemeSchema = z.object({
 });
 type TerminalTheme = z.infer<typeof terminalThemeSchema>;
 
-/**
- * TerminalWindowProps — props for TerminalWindow component
- */
+/** TerminalWindowProps — props for TerminalWindow component */
 interface TerminalWindowProps {
   /** The windowId mapping to desktopSlice for machineId lookup */
   windowId: string;
@@ -54,16 +47,117 @@ interface TerminalWindowProps {
   className?: string;
 }
 
-/**
- * TerminalWindow — Window chrome + Terminal component
- *
- * Consumes: 
- *   - wsClient (send_command, receive command_output) via wsMiddleware
- *   - desktopSlice (windowId → machineId mapping)
- *
- * Produces: Window chrome + xterm.js Terminal embedded inside
- *           Resizable, draggable window with terminal content
- */
+/** LazyTerminal — xterm.js terminal wrapped with addons, lazily loaded */
+const LazyTerminal: React.FC<{
+  onOutput: (output: string) => void;
+  onCommand: (command: string, metadata: { machineId: string }) => void;
+  dimensions: TerminalDimensions;
+}> = ({ onOutput, onCommand, dimensions }) => {
+  const termRef = useRef<HTMLElement>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    if (!termRef.current) return;
+
+    // @ts-expect-error - xterm types available globally at runtime
+    const Term: { new (options: any): any } = (window as any).Terminal;
+    // @ts-expect-error - xterm types available globally at runtime
+    const FitAddon: { new (term: any): any } = (window as any).FitAddon;
+    // @ts-expect-error - xterm types available globally at runtime
+    const WebLinksAddon: { new (term: any): any } = (window as any).WebLinksAddon;
+
+    if (!Term || !FitAddon || !WebLinksAddon) {
+      setIsMounted(true);
+      return;
+    }
+
+    // Create terminal instance
+    // @ts-expect-error - xterm constructor called with valid options
+    const term = new Term({
+      cursorBlink: true,
+      theme: {
+        background: 'var(--bg)',
+        foreground: 'var(--fg)',
+      },
+      fontFamily: 'ui-monospace, Menlo, Monaco, "Cascadia Mono", "Source Code Pro", monospace',
+      fontSize: 14,
+      lineHeight: 1.5,
+      convertEol: true,
+      scrollback: 1000,
+      auditBell: true,
+    });
+
+    // Initialize addons
+    // @ts-expect-error - addon constructors called with valid args
+    const fitAddon = new FitAddon(term);
+    // @ts-expect-error - addon constructor called with valid arg
+    const webLinksAddon = new WebLinksAddon(term);
+
+    term.loadAddon(fitAddon);
+    term.loadAddon(webLinksAddon);
+
+    // Handle keyboard input — send commands via onCommand callback
+    term.onData((data: string) => {
+      if (onCommand) {
+        onCommand(data, { machineId: 'unknown' }); // machineId resolved by parent
+      }
+    });
+
+    // Wrap term.write to track output
+    const originalWrite = term.write.bind(term);
+    term.write = (...args: any[]) => {
+      const output = args.join('');
+      originalWrite(...args);
+      if (onOutput) {
+        onOutput(output);
+      }
+    };
+
+    // Resize on window resize
+    const handleResize = () => {
+      // @ts-expect-error - addon method
+      fitAddon?.resize?.();
+    };
+    window.addEventListener('resize', handleResize);
+
+    setIsMounted(true);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      term.destroy();
+    };
+  }, [onCommand, onOutput]);
+
+  if (!isMounted) {
+    return (
+      <div
+        data-testid="terminal-lazy"
+        role="dialog"
+        aria-modal="true"
+        style={{
+          minHeight: 200,
+          backgroundColor: 'var(--bg)',
+          color: 'var(--fg)',
+        }}
+      />
+    );
+  }
+
+  return (
+    <div
+      data-testid="terminal-lazy"
+      role="dialog"
+      aria-modal="true"
+      style={{
+        backgroundColor: 'var(--bg)',
+        color: 'var(--fg)',
+        width: '100%',
+        minHeight: 200,
+      }}
+    />
+  );
+};
+
+/** TerminalWindow — Window chrome + Terminal component */
 const TerminalWindow: React.FC<TerminalWindowProps> = ({ windowId, className }) => {
   const dispatch = useDispatch();
   const { sessionId } = useSelector(
@@ -78,9 +172,8 @@ const TerminalWindow: React.FC<TerminalWindowProps> = ({ windowId, className }) 
   );
 
   const [terminalHeight, setTerminalHeight] = useState(400);
-  const termRef = useRef<any>(null);
 
-  // Send command to WebSocket server
+  // Send command to WebSocket server via wsMiddleware
   const sendCommand = (command: string) => {
     if (!sessionId) return;
     const payload = createSendCommand(machineId, command);
@@ -101,7 +194,6 @@ const TerminalWindow: React.FC<TerminalWindowProps> = ({ windowId, className }) 
           };
         };
         if (
-          isClientEventType(data.t) &&
           data.t === ClientEventType.COMMAND_OUTPUT &&
           data.payload?.machineId === machineId
         ) {
@@ -173,7 +265,6 @@ const TerminalWindow: React.FC<TerminalWindowProps> = ({ windowId, className }) 
         role="grid"
         aria-label={`Terminal for ${machineId}`}
       >
-        {/* Terminal rendered via React.lazy */}
         <LazyTerminal
           onOutput={(output: string) => {
             // Handle output - could send to backend or just display
@@ -188,9 +279,3 @@ const TerminalWindow: React.FC<TerminalWindowProps> = ({ windowId, className }) 
     </div>
   );
 };
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-TerminalWindow.propTypes = {};
-
-export { TerminalWindow };
-export type { TerminalWindowProps, TerminalDimensions, TerminalTheme };

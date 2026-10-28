@@ -1,13 +1,10 @@
-/**
- * desktop slice — window manager state mirroring ARCHITECTURE.md data models
- *
- * Consumes: (none — produces standalone desktop state)
- * Produces: desktopSlice with windows[], zOrder[], activeWindowId
- *
- * Strict TS: no `any`; use `unknown` + zod parsers at boundaries
- * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors
- * Accessibility: WCAG 2.1 AA
- */
+/** desktop slice — window manager state mirroring ARCHITECTURE.md data models
+* Consumes: (none — produces standalone desktop state)
+* Produces: desktopSlice with windows[], zOrder[], activeWindowId
+* Strict TS: no `any`; use `unknown` + zod parsers at boundaries
+* CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors
+* Accessibility: WCAG 2.1 AA
+*/
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { z } from 'zod';
@@ -45,6 +42,8 @@ type ActiveWindowId = z.infer<typeof activeWindowIdSchema> | undefined;
 // ---------------------------------------------------------------------------
 // Types matching ARCHITECTURE.md data model patterns
 // ---------------------------------------------------------------------------
+
+export enum AppType { EventViewer = 'event-viewer', ServicesPanel = 'services-panel', RegistryEditor = 'registry-editor', NetworkPanel = 'network-panel', ADUsersComputers = 'ad-users-computers', FileExplorer = 'file-explorer' }
 
 export interface DesktopState {
   // Window list
@@ -126,10 +125,7 @@ export const desktopSlice = createSlice({
     },
 
     /** Set window zOrder (bring to front / send to back) */
-    setZOrder: (
-      state,
-      action: PayloadAction<{ windowId: string; zIndex?: number }>
-    ) => {
+    setZOrder: (state, action: PayloadAction<{ windowId: string; zIndex?: number }>) => {
       const { windowId, zIndex } = action.payload;
       const windowZIndexEntry = state.zOrder.find((z) => z.windowId === windowId);
 
@@ -199,10 +195,7 @@ export const desktopSlice = createSlice({
     },
 
     /** Set window dimensions and position */
-    setWindowBounds: (
-      state,
-      action: PayloadAction<{ x: number; y: number; width: number; height: number } & { windowId: string }>
-    ) => {
+    setWindowBounds: (state, action: PayloadAction<{ x: number; y: number; width: number; height: number } & { windowId: string }>) => {
       const { x, y, width, height, windowId } = action.payload;
       const window = state.windows.find((w) => w.id === windowId);
       if (window) {
@@ -220,6 +213,31 @@ export const desktopSlice = createSlice({
       if (state.activeWindowId === action.payload) {
         state.activeWindowId = undefined;
       }
+    },
+
+    /** Open a simulated Windows app window */
+    openAppWindow: (state, action: PayloadAction<{ app: keyof typeof AppType; title: string; machineId: string }>) => {
+      const { app, title, machineId } = action.payload;
+      const newWindow = {
+        id: crypto.randomUUID(),
+        title,
+        innerWidth: 800,
+        innerHeight: 600,
+        x: 100,
+        y: 100,
+        state: 'normal' as const,
+        resizable: true,
+        draggable: true,
+        minimized: false,
+        maximized: false,
+        machineId,
+        app,
+      };
+      state.windows.push(newWindow as Window);
+      if (!state.zOrder.some((z) => z.windowId === newWindow.id)) {
+        state.zOrder.push({ windowId: newWindow.id, zIndex: state.zOrder.length });
+      }
+      state.activeWindowId = newWindow.id;
     },
   },
 });
@@ -240,6 +258,7 @@ export const {
   toggleWindowState,
   setWindowBounds,
   closeWindow,
+  openAppWindow,
 } = desktopSlice.actions;
 
 export default desktopSlice.reducer;

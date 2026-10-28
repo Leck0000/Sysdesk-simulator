@@ -1,0 +1,99 @@
+/**
+ * TopBar component — top navigation bar with user menu, theme toggle, and WS status
+ *
+ * Consumes: authSlice (user, roles, name), wsClient (connection status)
+ * Produces: TopBar (user avatar, theme toggle, WS status indicator)
+ *
+ * Strict TS: no `any`; use `unknown` + zod parsers at boundaries.
+ * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
+ * Accessibility: WCAG 2.1 AA (focus-visible, aria-labels, role attributes).
+ */
+import React, { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { sonner } from 'sonner';
+
+export function TopBar() {
+  const dispatch = useDispatch();
+  // Read user/roles from auth slice; handle empty slice gracefully
+  const user = useSelector((state: any) => state.auth?.user ?? null);
+  const roles = useSelector((state: any) => state.auth?.roles ?? []);
+
+  const [theme, setThemeValue] = React.useState<'light' | 'dark'>('dark');
+
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setThemeValue(prefersDark ? 'dark' : 'light');
+  }, []);
+
+  const toggleThemeHandler = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setThemeValue(newTheme);
+    sonner.info(`Theme switched to ${newTheme}`, {
+      action: null,
+    });
+  };
+
+  return (
+    <header
+      className="flex items-center justify-between p-4 border-b border-var(--border) bg-var(--card) flex-shrink-0"
+    >
+      <div className="flex items-center gap-3">
+        <h2 className="text-xl font-semibold text-var(--fg)">
+          Ticket Queue
+        </h2>
+      </div>
+
+      <div className="flex items-center gap-4">
+        {/* User menu */}
+        {user && (
+          <div
+            onClick={() => console.log('Open user menu')}
+            className="relative cursor-pointer"
+            aria-haspopup="menu"
+            aria-label="User menu"
+          >
+            <div className="flex items-center gap-2">
+              <img
+                src="/user-avatar.png"
+                alt={user.name}
+                className="w-8 h-8 rounded-full object-cover"
+                loading="lazy"
+              />
+              <span className="text-var(--muted) text-sm">{user.name}</span>
+            </div>
+            <div
+              className="absolute right-0 mt-2 w-24 rounded border-var(--border) bg-var(--card) p-2 shadow-md z-10 hidden focus:not-hidden"
+              role="menu"
+              aria-orientation="vertical"
+            >
+              {roles.includes('admin') && (
+                <button
+                  className="w-full text-left p-1 text-sm text-var(--fg) focus:outline-none focus:bg-var(--muted) rounded"
+                  aria-label="Admin settings"
+                >
+                  Admin settings
+                </button>
+              )}
+              <button
+                className="w-full text-left text-sm text-var(--fg) hover:text-var(--muted) focus:outline-none focus:bg-var(--muted) rounded"
+                onClick={() => dispatch(logout())}
+                aria-label="Logout"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Theme toggle */}
+        <button
+          onClick={toggleThemeHandler}
+          className="p-1 rounded hover:bg-var(--muted) transition-colors"
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+        >
+          {theme === 'dark' ? '☀' : '🌙'}
+        </button>
+      </div>
+    </header>
+  );
+}

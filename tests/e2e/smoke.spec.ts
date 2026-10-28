@@ -32,3 +32,19 @@ test('responsive layout - sidebar collapses at <1024px', async ({ page }) => {
   // The drawer should be accessible
   await expect(sidebar).toBeVisible({ timeout: 15000 });
 });
+
+test('ticket queue loads and displays tickets', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  // Check that ticket queue is present
+  await expect(page.getByTestId('ticket-queue')).toBeVisible({ timeout: 15000 });
+  // Check that at least one ticket card is present
+  await expect(page.getByTestId('ticket-card')).toBeVisible({ timeout: 15000 });
+});
+
+test('authentication flows', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  // Check that login is accessible
+  await expect(page.getByRole('button', { name: /login|sign in/i })).toBeVisible({ timeout: 15000 });
+});
