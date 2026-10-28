@@ -1,7 +1,7 @@
 {
   "name": "sysdesk",
   "version": "1.0.0",
-  "description": "",
+  "description": "Browser-based IT help desk simulator for technician training — SysDesk",
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
