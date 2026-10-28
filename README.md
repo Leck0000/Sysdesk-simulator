@@ -1,4 +1,4 @@
-# SysDesk Simulator
+# OpenDesk Simulator
 
 **Browser-based IT help desk simulator for technician training.**
 
