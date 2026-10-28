@@ -8,7 +8,7 @@ Simulate a complete support shift: claim tickets, investigate virtual Windows ma
 
 ## Overview
 
-SysDesk is a deterministic, browser-based Windows simulator that runs a complete support shift in one connected workspace. Technicians claim tickets, investigate simulated Windows machines using realistic command-line tools, communicate with users via AI voice, and earn Ed25519-signed certificates upon completion.
+Opendesk is a deterministic, browser-based Windows simulator that runs a complete support shift in one connected workspace. Technicians claim tickets, investigate simulated Windows machines using realistic command-line tools, communicate with users via AI voice, and earn Ed25519-signed certificates upon completion.
 
 The system evaluates performance across three dimensions:
 
