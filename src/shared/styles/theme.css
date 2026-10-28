@@ -1,0 +1,26 @@
+:root {
+  --bg: #0a0a0f;
+  --fg: #eaeaea;
+  --muted: #6b6b80;
+  --accent: #00d4aa;
+  --card: #14141f;
+  --border: #2a2a3a;
+}
+
+.dark {
+  --bg: #0a0a0f;
+  --fg: #eaeaea;
+  --muted: #6b6b80;
+  --accent: #00d4aa;
+  --card: #14141f;
+  --border: #2a2a3a;
+}
+
+.light {
+  --bg: #fafafa;
+  --fg: #111111;
+  --muted: #8888a0;
+  --accent: #00d4aa;
+  --card: #ffffff;
+  --border: #e0e0e0;
+}
