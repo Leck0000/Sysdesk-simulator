@@ -1,176 +1,93 @@
 /**
- * ChatPanel — threaded chat panel per ticket
- * 
- * Consumes: ticketsSlice (selectedTicketId), authSlice (role for instructor vs technician views)
- * Produces: threaded chat UI with message input
- * 
- * Strict TS: no `any`; use `unknown` + zod parsers at boundaries.
- * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
- * Accessibility: WCAG 2.1 AA
- * Responsive: >=1280px desktop-first; sidebar collapses to drawer <1024px
+ * ChatPanel — live chat with the requester for one ticket.
+ *
+ * Consumes: communication slice (thread, chat channel), ws slice (connection state)
+ * Produces: sendTicketMessage({ channel: 'chat' }) -> ws add_ticket_message
+ * Theming: Tailwind tokens mapped to CSS variables. Accessibility: the message list is a
+ * polite live log; the input is labelled; errors are announced.
  */
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { selectThread, sendTicketMessage } from './slice';
+import { MessageMeta } from './MessageMeta';
 
-import { useEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { selectThreadMessages, selectThreadStatus, selectThreadError } from './slice';
-import { selectSelectedTicket } from '../tickets/slice';
-import { processRequesterMessage } from './slice';
-import { z } from 'zod';
-import { v4 as uuidv4 } from 'uuid';
-import { toast } from 'sonner';
-
-// Message input schema for boundary validation
-const MessageInputSchema = z.object({
-  text: z.string().min(1).max(1000),
-});
-
-
-interface ChatPanelProps {
+export interface ChatPanelProps {
   ticketId: string;
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ ticketId }) => {
-  const selectedTicket = useSelector(selectSelectedTicket);
-  const messages = useSelector(selectThreadMessages(ticketId));
-  const threadStatus = useSelector(selectThreadStatus(ticketId));
-  const threadError = useSelector(selectThreadError(ticketId));
-  
-  const [inputValue, setInputValue] = useState('');
-  
-  // Scroll to bottom ref
-  const bottomRef = useRef<HTMLDivElement>(null);
-  
-  // Fetch initial messages on mount
+export const ChatPanel: React.FC<ChatPanelProps> = ({ ticketId }) => {
+  const dispatch = useAppDispatch();
+  const thread = useAppSelector((s) => selectThread(s, ticketId));
+  const connected = useAppSelector((s) => s.ws.connected);
+  const messages = useMemo(() => thread.messages.filter((m) => m.channel === 'chat'), [thread.messages]);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const endRef = useRef<HTMLLIElement>(null);
+
   useEffect(() => {
-    // In a full impl, this would fetch from an API
-    // For now, the thread state is managed via wsMiddleware
-  }, [ticketId]);
-  
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
+    endRef.current?.scrollIntoView?.({ block: 'end' });
   }, [messages.length]);
-  
-  const handleSend = (e: React.FormEvent) => {
+
+  const send = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const validated = MessageInputSchema.safeParse({ text: inputValue });
-    if (!validated.success) {
-      toast.error('Message must be between 1 and 1000 characters');
-      return;
-    }
-    
-    const message = {
-      id: uuidv4(),
-      ticketId,
-      from: 'system', // In a real app, this would be 'requester' or 'system' based on context
-      text: validated.data.text,
-      timestamp: new Date().toISOString(),
-    };
-    
-    // Add message to thread state
-    processRequesterMessage(message, ticketId);
-    
-    // Clear input
-    setInputValue('');
-  };
-  
-  // Handle paste events to prevent default newline behavior
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend(e);
+    const result = dispatch(sendTicketMessage({ ticketId, channel: 'chat', text: draft }));
+    if (result.ok) {
+      setDraft('');
+      setError(null);
+    } else {
+      setError(result.error);
     }
   };
-  
-  // Render error state
-  if (threadError && threadStatus === 'failed') {
-    return (
-      <div role="alert" className="communication-error" aria-live="polite">
-        Failed to load chat: {threadError}
-      </div>
-    );
-  }
-  
-  // Render loading state
-  if (threadStatus === 'loading') {
-    return (
-      <div className="communication-loading" aria-live="polite">
-        Loading messages...
-      </div>
-    );
-  }
-  
+
   return (
-    <section className="chat-panel" aria-labelledby="chat-panel-title" tabIndex={0}>
-      <h2 id="chat-panel-title" className="chat-panel-title">
-        Chat — {selectedTicket?.queue ?? 'Unknown'} / {selectedTicket?.id ?? ticketId}
-      </h2>
-      
-      {/* Thread messages */}
-      <div className="chat-messages" ref={bottomRef} aria-roledescription="chat" aria-label="Threaded messages for ticket {ticketId}">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className="chat-message"
-            aria-label={
-              `${msg.from === 'requester' ? 'Requester' : 'System'} at ${new Date(msg.timestamp).toLocaleTimeString()}`
-            }
+    <section aria-label="Chat with requester" className="flex min-h-0 flex-1 flex-col">
+      {!connected && (
+        <p className="mb-2 rounded border border-border bg-card px-2 py-1 text-xs text-muted">
+          Not connected to a lab session — messages are kept here but not delivered.
+        </p>
+      )}
+      <ol role="log" aria-live="polite" aria-label="Chat messages" className="flex-1 space-y-2 overflow-y-auto">
+        {messages.length === 0 && <li className="text-sm text-muted">No messages yet. Start the conversation.</li>}
+        {messages.map((m) => (
+          <li
+            key={m.id}
+            className={`max-w-[80%] rounded border border-border p-2 text-sm ${m.from === 'technician' ? 'ml-auto bg-card' : 'bg-bg'}`}
           >
-            <div className="message-avatar">{msg.from[0]}</div>
-            <div className="message-bubble" role="treeitem" aria-expanded="true" aria-describedby="msg-{msg.id}">
-              {msg.text}
-            </div>
-            <span className="message-timestamp" id="msg-{msg.id}">{new Date(msg.timestamp).toLocaleTimeString()}</span>
-          </div>
+            <p className="whitespace-pre-wrap text-fg">{m.text}</p>
+            <MessageMeta message={m} />
+          </li>
         ))}
-        {/* Empty state */}
-        {messages.length === 0 && (
-          <div className="chat-empty" aria-live="polite">
-            No messages yet. Start the conversation.
-          </div>
-        )}
-      </div>
-      
-      {/* Status indicators */}
-      {threadError && threadStatus === 'failed' && (
-        <p className="communication-error" role="alert" aria-live="polite">
-          Failed to load chat: {threadError}
-        </p>
-      )}
-      {threadStatus === 'loading' && (
-        <p className="communication-loading" role="status" aria-live="polite">
-          Loading messages...
-        </p>
-      )}
-      
-      {/* Send message form */}
-      <form onSubmit={handleSend} className="chat-form" aria-label="Send message to ticket {ticketId}">
-        <div className="form-group">
-          <textarea
-            placeholder="Type a message..."
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={threadStatus === 'loading' || threadStatus === 'failed'}
-            rows={1}
-            className="chat-input"
-            aria-label="Message input"
-            aria-autocomplete="inline"
-            aria-controls="chat-messages"
-          />
-          <button
-type="submit"
-            disabled={threadStatus === 'loading' || threadStatus === 'failed'}
-            className="chat-submit"
-            aria-label="Send message"
-          >
-            Send
-          </button>
-        </div>
+        <li ref={endRef} aria-hidden="true" />
+      </ol>
+      <form onSubmit={send} className="mt-3 flex gap-2">
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
+          rows={2}
+          placeholder="Message the requester…"
+          aria-label="Chat message"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? 'chat-error' : undefined}
+          className="flex-1 resize-none rounded border border-border bg-card p-2 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        />
+        <button
+          type="submit"
+          className="self-end rounded bg-accent px-4 py-2 text-sm font-medium text-bg hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          Send
+        </button>
       </form>
+      {error && (
+        <p id="chat-error" role="alert" className="mt-1 text-xs text-fg">
+          {error}
+        </p>
+      )}
     </section>
   );
 };

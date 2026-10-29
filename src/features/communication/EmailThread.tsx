@@ -1,156 +1,102 @@
 /**
- * EmailThread — simulated email thread per ticket
+ * EmailThread — simulated email conversation with the requester for one ticket.
  *
- * Consumes: wsClient (requester_message, scoring_update), ticketsSlice (selectedTicketId),
- *           authSlice (role for instructor vs technician views)
- * Produces: simulated email thread UI
- *
- * Strict TS: no `any`; use `unknown` + zod parsers at boundaries.
- * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
- * Accessibility: WCAG 2.1 AA
- * Responsive: >=1280px desktop-first; sidebar collapses to drawer <1024px
+ * Consumes: communication slice (thread, email channel), ws slice (connection state)
+ * Produces: sendTicketMessage({ channel: 'email' }) -> ws add_ticket_message with the
+ *           subject folded into the text (the protocol has no subject field)
+ * Theming: Tailwind tokens mapped to CSS variables. Accessibility: labelled fields,
+ * messages are articles with a heading per subject, errors are announced.
  */
+import React, { useMemo, useState } from 'react';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { selectThread, sendTicketMessage } from './slice';
+import { MessageMeta } from './MessageMeta';
 
-import { useState } from 'react';
-import { useSelector } from 'react-redux';
-import { selectThreadMessages, selectThreadStatus, selectThreadError } from './slice';
-import { selectSelectedTicket } from '../tickets/slice';
-
-// Email message schema for boundary validation
-const EmailMessageSchema = z.object({
-  id: z.string().uuid(),
-  ticketId: z.string().uuid(),
-  from: z.enum(['requester', 'system', 'technician']),
-  subject: z.string().min(1).max(200),
-  text: z.string().min(1).max(2000),
-  timestamp: z.string().datetime(),
-});
-
-
-interface EmailThreadProps {
+export interface EmailThreadProps {
   ticketId: string;
+  /** Prefills the subject of the first email. */
+  defaultSubject?: string;
 }
 
-const EmailThread: React.FC<EmailThreadProps> = ({ ticketId }) => {
-  const messages = useSelector(selectThreadMessages(ticketId));
-  const threadStatus = useSelector(selectThreadStatus(ticketId));
-  const threadError = useSelector(selectThreadError(ticketId));
-  const selectedTicket = useSelector(selectSelectedTicket);
+const fieldClass =
+  'w-full rounded border border-border bg-card p-2 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent';
 
-  const [newSubject, setNewSubject] = useState('');
-  const [newBody, setNewBody] = useState('');
+export const EmailThread: React.FC<EmailThreadProps> = ({ ticketId, defaultSubject = '' }) => {
+  const dispatch = useAppDispatch();
+  const thread = useAppSelector((s) => selectThread(s, ticketId));
+  const connected = useAppSelector((s) => s.ws.connected);
+  const emails = useMemo(() => thread.messages.filter((m) => m.channel === 'email'), [thread.messages]);
+  const lastSubject = emails.at(-1)?.subject;
+  const [subject, setSubject] = useState(defaultSubject);
+  const [body, setBody] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  // Validate email subject/body input
-  const validateInput = (): boolean => {
-    const result = EmailMessageSchema.safeParse({
-      id: crypto.randomUUID(),
-      ticketId,
-      from: 'system',
-      subject: newSubject.trim(),
-      text: newBody.trim(),
-      timestamp: new Date().toISOString(),
-    });
+  // Replies continue the conversation: "Re: <last subject>" unless the user typed one.
+  const effectiveSubject = subject || (lastSubject ? `Re: ${lastSubject.replace(/^Re: /, '')}` : '');
 
-    if (!result.success) {
-      sonner.error('Subject must be 1-200 chars, body 1-2000 chars');
-      return false;
+  const send = (e: React.FormEvent) => {
+    e.preventDefault();
+    const result = dispatch(sendTicketMessage({ ticketId, channel: 'email', subject: effectiveSubject, text: body }));
+    if (result.ok) {
+      setSubject('');
+      setBody('');
+      setError(null);
+    } else {
+      setError(result.error);
     }
-    return true;
   };
-
-  // Send simulated email
-  const handleSend = () => {
-    if (!validateInput()) return;
-
-    // NOTE: sending is not implemented yet; the validated message is not dispatched.
-
-    // Add message to thread state
-    // In a real app, this would send via API and receive WS confirmation
-    // For now, we add to the local thread via the communication slice
-    // processRequesterMessage is adapted for email-like messages
-
-    setNewSubject('');
-    setNewBody('');
-  };
-
-  // Render error state
-  if (threadError && threadStatus === 'failed') {
-    return (
-      <div role="alert" className="communication-error" aria-live="polite">
-        Failed to load email thread: {threadError}
-      </div>
-    );
-  }
-
-  // Render loading state
-  if (threadStatus === 'loading') {
-    return (
-      <div className="communication-loading" aria-live="polite">Loading email thread...</div>
-    );
-  }
 
   return (
-    <section className="email-thread" aria-labelledby="email-thread-title" aria-label="Email thread for ticket {ticketId}">
-      <h2 id="email-thread-title">Email Thread — {selectedTicket?.queue ?? 'Unknown'} / {selectedTicket?.id ?? ticketId}</h2>
-
-      {/* Status indicators */}
-      {threadError && threadStatus === 'failed' && (
-        <p role="alert" aria-live="polite" className="communication-error">
-          Failed to load email thread: {threadError}
+    <section aria-label="Email with requester" className="flex min-h-0 flex-1 flex-col">
+      {!connected && (
+        <p className="mb-2 rounded border border-border bg-card px-2 py-1 text-xs text-muted">
+          Not connected to a lab session — emails are kept here but not delivered.
         </p>
       )}
-
-      {threadStatus === 'loading' && (
-        <p className="communication-loading" role="status" aria-live="polite">Loading email thread...</p>
-      )}
-
-      {/* Email messages list */}
-      <div className="email-messages" aria-roledescription="email" aria-label="Email messages for ticket {ticketId}">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className="email-message"
-            aria-label={`Email from ${msg.from} at ${new Date(msg.timestamp).toLocaleTimeString()}: ${msg.subject}`}
-          >
-            <div className="email-avatar">{msg.from[0]}</div>
-            <div className="email-subject">{msg.subject}</div>
-            <div className="email-body">{msg.text}</div>
-            <span className="email-timestamp">{new Date(msg.timestamp).toLocaleTimeString()}</span>
-          </div>
+      <div role="log" aria-live="polite" aria-label="Emails" className="flex-1 space-y-2 overflow-y-auto">
+        {emails.length === 0 && <p className="text-sm text-muted">No emails yet.</p>}
+        {emails.map((m) => (
+          <article key={m.id} className="rounded border border-border bg-card p-3 text-sm">
+            <header className="mb-1 flex items-baseline justify-between gap-2">
+              <h3 className="font-semibold text-fg">{m.subject ?? '(no subject)'}</h3>
+              <span className="text-xs capitalize text-muted">{m.from === 'technician' ? 'You' : m.from}</span>
+            </header>
+            <p className="whitespace-pre-wrap text-fg">{m.text}</p>
+            <MessageMeta message={m} />
+          </article>
         ))}
-
-        {/* Empty state */}
-        {messages.length === 0 && (
-          <div className="email-empty" aria-live="polite">
-            No emails yet. Start the conversation.
-          </div>
-        )}
       </div>
-
-      {/* Send email form */}
-      <form onSubmit={handleSend} className="email-form" aria-label="Send email to ticket {ticketId}">
-        <div className="email-form-group">
-          <textarea
-            placeholder="Subject..."
-            value={newSubject}
-            onChange={(e) => setNewSubject(e.target.value)}
-            rows={1}
-            maxRows={3}
-            className="email-subject-input"
-            aria-label="Email subject"
-            aria-autocomplete="inline"
-          />
-          <textarea
-            placeholder="Message body..."
-            value={newBody}
-            onChange={(e) => setNewBody(e.target.value)}
-            rows={3}
-            maxRows={10}
-            className="email-body-input"
-            aria-label="Email body"
-          />
-          <button type="submit" className="email-submit" disabled={!newSubject.trim() || !newBody.trim()}>
-            Send
+      <form onSubmit={send} className="mt-3 space-y-2" aria-label="Compose email">
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder={effectiveSubject || 'Subject'}
+          aria-label="Email subject"
+          className={fieldClass}
+        />
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={4}
+          placeholder="Write to the requester…"
+          aria-label="Email body"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? 'email-error' : undefined}
+          className={`${fieldClass} resize-none`}
+        />
+        <div className="flex items-center justify-between gap-2">
+          {error ? (
+            <p id="email-error" role="alert" className="text-xs text-fg">
+              {error}
+            </p>
+          ) : (
+            <span />
+          )}
+          <button
+            type="submit"
+            className="rounded bg-accent px-4 py-2 text-sm font-medium text-bg hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Send email
           </button>
         </div>
       </form>

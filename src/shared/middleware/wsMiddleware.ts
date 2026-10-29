@@ -13,8 +13,10 @@ import {
   ScoringUpdatePayloadSchema,
   CommandOutputPayloadSchema,
   StateDeltaPayloadSchema,
+  RequesterMessagePayloadSchema,
 } from '../ws/envelope';
 import { appendTerminalOutput, applyStateDelta } from '../../features/desktop/slice';
+import { receiveRequesterMessage } from '../../features/communication/slice';
 
 // WebSocket middleware: intercepts Redux WS actions and manages the
 // single WebSocket connection via WSClient. All WebSocket messages go
@@ -81,6 +83,12 @@ export const wsMiddleware: Middleware = (store) => (next) => (action) => {
           type: 'scores/mergeScoringUpdate',
           payload: scoringUpdate.data,
         });
+      }
+    }
+    if (envelope.t === ServerEventType.REQUESTER_MESSAGE) {
+      const parsed = RequesterMessagePayloadSchema.safeParse(envelope.payload);
+      if (parsed.success) {
+        store.dispatch(receiveRequesterMessage(parsed.data));
       }
     }
   }

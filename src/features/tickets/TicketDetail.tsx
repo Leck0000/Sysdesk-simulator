@@ -1,34 +1,32 @@
 /**
  * TicketDetail — the selected ticket: summary, actions and message thread.
  *
- * Consumes: ticketsSlice (selected ticket), ticketsApi (addMessage), claimTicket thunk,
- *           desktopSlice (open a terminal on the ticket's machine)
+ * Consumes: ticketsSlice (selected ticket), claimTicket thunk, desktopSlice (open a
+ *           terminal on the ticket's machine), communication (chat + email tabs)
  * Strict TS: no `any`. Theming via Tailwind tokens mapped to CSS variables.
  * Accessibility: labelled form controls; status changes announced via role="status".
  */
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { selectSelectedTicket, claimTicket } from './slice';
-import { useAddMessageMutation } from './api';
 import { openAppWindow } from '../desktop/slice';
 import { DEFAULT_MACHINE_ID } from '../desktop/WindowsAppsLauncher';
+import { ChatPanel } from '../communication/ChatPanel';
+import { EmailThread } from '../communication/EmailThread';
 
-interface LocalMessage {
-  text: string;
-  status: 'sending' | 'sent' | 'failed';
-}
+type Channel = 'chat' | 'email';
+const CHANNELS: Array<{ id: Channel; label: string }> = [
+  { id: 'chat', label: 'Chat' },
+  { id: 'email', label: 'Email' },
+];
 
 export function TicketDetail() {
   const dispatch = useAppDispatch();
   const ticket = useAppSelector(selectSelectedTicket);
-  const [addMessage] = useAddMessageMutation();
-  const [draft, setDraft] = useState('');
-  const [messages, setMessages] = useState<LocalMessage[]>([]);
+  const [channel, setChannel] = useState<Channel>('chat');
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    setMessages([]);
-    setDraft('');
     setNotice(null);
   }, [ticket?.id]);
 
@@ -41,19 +39,6 @@ export function TicketDetail() {
   }
 
   const machineId = ticket.relatedMachineId ?? DEFAULT_MACHINE_ID;
-
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text) return;
-    setDraft('');
-    const index = messages.length;
-    setMessages((prev) => [...prev, { text, status: 'sending' }]);
-    const result = await addMessage({ ticketId: ticket.id, message: text });
-    setMessages((prev) =>
-      prev.map((m, i) => (i === index ? { ...m, status: 'error' in result ? 'failed' : 'sent' } : m))
-    );
-  };
 
   const claim = async () => {
     try {
@@ -119,37 +104,39 @@ export function TicketDetail() {
         ))}
       </dl>
 
-      <section aria-labelledby="messages-heading" className="flex min-h-0 flex-1 flex-col p-4">
-        <h2 id="messages-heading" className="mb-2 text-sm font-semibold text-fg">
-          Messages
-        </h2>
-        <ol className="flex-1 space-y-2 overflow-y-auto">
-          {messages.length === 0 && <li className="text-sm text-muted">No messages yet.</li>}
-          {messages.map((m, i) => (
-            <li key={i} className="rounded border border-border bg-card p-2 text-sm">
-              <p className="whitespace-pre-wrap text-fg">{m.text}</p>
-              <p className="mt-1 text-[11px] text-muted">
-                {m.status === 'sending' ? 'Sending…' : m.status === 'sent' ? 'Sent' : 'Not delivered — server unavailable'}
-              </p>
-            </li>
+      <section aria-label="Communication" className="flex min-h-0 flex-1 flex-col p-4">
+        <div role="tablist" aria-label="Communication channel" className="mb-3 flex gap-1 border-b border-border">
+          {CHANNELS.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="tab"
+              id={`tab-${c.id}`}
+              aria-selected={channel === c.id}
+              aria-controls={`panel-${c.id}`}
+              tabIndex={channel === c.id ? 0 : -1}
+              onClick={() => setChannel(c.id)}
+              onKeyDown={(e) => {
+                if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+                const next = channel === 'chat' ? 'email' : 'chat';
+                setChannel(next);
+                document.getElementById(`tab-${next}`)?.focus();
+              }}
+              className={`-mb-px border-b-2 px-3 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                channel === c.id ? 'border-accent font-semibold text-fg' : 'border-transparent text-muted hover:text-fg'
+              }`}
+            >
+              {c.label}
+            </button>
           ))}
-        </ol>
-        <form onSubmit={send} className="mt-3 flex gap-2">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={2}
-            placeholder="Reply to the requester…"
-            aria-label="Message to requester"
-            className="flex-1 resize-none rounded border border-border bg-card p-2 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          />
-          <button
-            type="submit"
-            className="self-end rounded bg-accent px-4 py-2 text-sm font-medium text-bg hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Send
-          </button>
-        </form>
+        </div>
+        <div role="tabpanel" id={`panel-${channel}`} aria-labelledby={`tab-${channel}`} className="flex min-h-0 flex-1 flex-col">
+          {channel === 'chat' ? (
+            <ChatPanel ticketId={ticket.id} />
+          ) : (
+            <EmailThread ticketId={ticket.id} defaultSubject={ticket.category ?? ticket.queue} />
+          )}
+        </div>
       </section>
     </article>
   );
