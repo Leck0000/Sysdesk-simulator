@@ -14,17 +14,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
+      # pnpm version comes from package.json "packageManager" (pnpm@9.12.0).
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      # Node version comes from .nvmrc (jsdom 30 -> undici 8 requires Node >= 22.19).
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '>=20'
-          cache: 'pnpm'
+          node-version-file: .nvmrc
+          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         run: pnpm lint
@@ -39,24 +44,10 @@ jobs:
         run: pnpm build
 
       - name: Install Playwright browsers
-        run: pnpm playwright install --with-deps
+        run: pnpm exec playwright install --with-deps chromium
 
-      - name: Start dev server
-        run: pnpm exec vite preview --port 3000 --host 0.0.0.2>/dev/null &
-        working-dir: .
-        env:
-          VITE_PORT: 3000
-        # Wait for dev server to be ready
-        run: |
-          for i in $(seq 1 30); do
-            if curl -s http://localhost:3000/ > /dev/null 2>&1; then
-              echo "Dev server is ready"
-              break
-            fi
-            sleep 1
-          done
-
+      # playwright.config.ts starts `vite preview` itself (webServer) and serves dist/.
       - name: E2E tests
-        run: pnpm playwright test
+        run: pnpm exec playwright test --project=Chromium
         env:
           CI: true

@@ -15,6 +15,9 @@ pnpm exec vite preview --port 3001
 
 Open `http://localhost:3001/opendesk-simulator/?demo=1` for sample data.
 
+Node: the version in `.nvmrc` (24.11.1). Node 20 cannot run the test suite
+(jsdom 30 depends on undici 8, which requires Node >= 22.19).
+
 ## TypeScript Version
 
 This project uses **TypeScript 6.0.3** (pinned in `package.json` as `"typescript": "~6.0.3"`).
