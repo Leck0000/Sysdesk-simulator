@@ -31,6 +31,7 @@ export const WSActionType = {
   
   // Message handling
   SEND: 'ws/send',
+  SENT: 'ws/sent',
   MESSAGE: 'ws/message',
   SEND_FAILED: 'ws/send_failed',
   
@@ -144,6 +145,11 @@ export function wsReconnectFailed(payload: { maxAttempts: number }) {
 // Message handling
 export function wsSend(payload: WSSendPayload) {
   return { type: WSActionType.SEND, payload } as const;
+}
+
+/** Notification: the client wrote a message to the socket (not a command). */
+export function wsSent(payload: WSSendPayload) {
+  return { type: WSActionType.SENT, payload } as const;
 }
 
 export function wsMessage<T>(payload: WSMessagePayload<T>) {

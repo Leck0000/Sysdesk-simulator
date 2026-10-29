@@ -10,10 +10,9 @@ import type {
   WSEnvelope,
   ClientToServerPayload,
   ClientAckPayload,
-  parseEnvelope,
-  createEnvelope,
   ServerToClientPayload,
 } from './envelope';
+import { parseEnvelope, createEnvelope } from './envelope';
 
 import type {
   WSActionType,
@@ -37,7 +36,7 @@ import {
   wsDisconnected,
   wsReconnecting,
   wsReconnectFailed,
-  wsSend,
+  wsSent,
   wsMessage,
   wsSendFailed,
   wsHeartbeatSent,
@@ -320,7 +319,7 @@ export class WSClient extends EventEmitter {
     const message = JSON.stringify(envelope);
     this.ws.send(message);
 
-    this.dispatch?.(wsSend({ type, payload }));
+    this.dispatch?.(wsSent({ type, payload }));
 
     // For messages that expect ack (non-heartbeat, non-ack)
     if (type !== ClientEventType.HEARTBEAT && type !== ClientEventType.CLIENT_ACK) {

@@ -18,13 +18,6 @@ import { ServerEventType, ScoringUpdatePayloadSchema } from '../ws/envelope';
 /** Client created on the first ws/connect; null until then. */
 let client: WSClient | null = null;
 
-/**
- * WSClient.send() dispatches its own ws/send notification synchronously.
- * Without this guard that echo would re-enter the middleware and call
- * send() again, recursing until the stack overflows.
- */
-let isSending = false;
-
 export const wsMiddleware: Middleware = (store) => (next) => (action) => {
   const result = next(action);
 
@@ -41,26 +34,21 @@ export const wsMiddleware: Middleware = (store) => (next) => (action) => {
     client?.disconnect();
   }
 
-  if (isWSAction(action) && action.type === WSActionType.SEND && !isSending) {
+  if (isWSAction(action) && action.type === WSActionType.SEND) {
     const { type, payload } = action.payload as WSSendPayload;
     if (client && type === ClientEventType.SEND_COMMAND) {
-      isSending = true;
-      try {
-        client.send(type, payload).catch((err: unknown) => {
-          store.dispatch({
-            type: WSActionType.SEND_FAILED,
-            payload: {
-              type,
-              payload,
-              error: err instanceof Error ? err.message : String(err),
-            },
-          });
+      const reportFailure = (err: unknown) => {
+        store.dispatch({
+          type: WSActionType.SEND_FAILED,
+          payload: { type, payload, error: err instanceof Error ? err.message : String(err) },
         });
-      } catch {
-        // send() throws synchronously when the socket is not open; the
-        // client has already dispatched ws/send_failed in that case.
-      } finally {
-        isSending = false;
+      };
+      try {
+        client.send(type, payload).catch(reportFailure);
+      } catch (err) {
+        // On a closed socket send() throws and has already dispatched
+        // ws/send_failed itself; report anything else.
+        if (client.isConnected()) reportFailure(err);
       }
     }
   }
