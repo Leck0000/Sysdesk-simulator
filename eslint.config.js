@@ -1,6 +1,5 @@
 // ESLint flat config (ESLint 10 + typescript-eslint 8).
-// typescript-eslint needs the TypeScript 6 API: package.json aliases
-// `typescript` -> @typescript/typescript6, and `tsc` (TS 7) comes from @typescript/native.
+// typescript-eslint supports TypeScript <6.1, so package.json pins typescript ~6.0 (see README).
 import js from '@eslint/js';
 import globals from 'globals';
 import tsParser from '@typescript-eslint/parser';

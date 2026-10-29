@@ -113,6 +113,15 @@ pnpm test:e2e
 
 Runs Playwright E2E tests.
 
+### TypeScript version
+
+TypeScript is pinned to `~6.0.3` in `package.json`. typescript-eslint 8 supports
+TypeScript `>=4.8.4 <6.1.0` and refuses to load under TypeScript 7.0, because
+TS 7 (the native Go port) ships without the compiler API that lint tools use.
+`pnpm typecheck` (`tsc --noEmit`) and `pnpm lint` therefore use the same TS 6
+compiler. Move to TypeScript 7 once typescript-eslint supports it
+(tracked in typescript-eslint/typescript-eslint#10940).
+
 ---
 
 ## API Contracts
