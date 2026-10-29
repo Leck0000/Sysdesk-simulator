@@ -15,17 +15,19 @@
    aria-labels, live region announcements.
 */
 
-import React from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { selectProgressStream, selectTeamStatus, selectTeamError } from './api';
-import { clearProgressStream } from './slice';
+import React, { useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { useAppDispatch } from '../../app/hooks';
+import type { RootState } from '../../app/store';
+import { subscribeLabProgressThunk } from './slice';
 
-const ProgressStream: React.FC = () => {
-  const dispatch = useDispatch();
+export const ProgressStream: React.FC = () => {
+  
   const progressStream = useSelector(
     (state: RootState) => state.team.progressStream
   );
   const teamStatus = useSelector((state: RootState) => state.team.status);
+  const dispatch = useAppDispatch();
   const teamError = useSelector((state: RootState) => state.team.error);
 
   // Effect: subscribe to WS lab progress events
@@ -65,12 +67,12 @@ const ProgressStream: React.FC = () => {
       {/* Progress stream table */}
       <div className="rounded-md overflow-hidden" style={{ background: 'var(--card)' }}>
         <div className="p-3 border-b" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
-          <h3 className="text-font-medium text-var(--fg) row-span-1">
-            Progress Stream <span className="text-xs text-var(--muted)">({progressStream.length})</span>
+          <h3 className="text-font-medium text-fg row-span-1">
+            Progress Stream <span className="text-xs text-muted">({progressStream.length})</span>
           </h3>
         </div>
         <div className="h-64 overflow-y-auto" style={{ background: 'var(--bg)' }}>
-          {progressStream.map((entry, i) => (
+          {progressStream.map((entry: { labId?: string; progress: number; timestamp: string }, i: number) => (
             <div
               key={i}
               className="flex items-center gap-2 rounded-md p-1 transition-colors duration-150"
@@ -88,7 +90,7 @@ const ProgressStream: React.FC = () => {
                 <p className="text-xs font-medium truncate">
                   {entry.labId || 'Unassigned lab'}
                 </p>
-                <p className="text-xs text-var(--muted) truncate">
+                <p className="text-xs text-muted truncate">
                   Progress: {entry.progress}%
                 </p>
               </div>
@@ -101,7 +103,7 @@ const ProgressStream: React.FC = () => {
             </div>
           ))}
           {progressStream.length === 0 && (
-            <p className="text-var(--muted) text-center py-8">
+            <p className="text-muted text-center py-8">
               No progress updates yet
             </p>
           )}
@@ -111,6 +113,3 @@ const ProgressStream: React.FC = () => {
   );
 };
 
-export const ProgressStream: React.FC = () => {
-  return <ProgressStream />;
-};

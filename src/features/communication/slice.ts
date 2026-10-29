@@ -1,50 +1,36 @@
 /**
- * communication slice — requester message and scoring update state
+ * communication slice — per-ticket conversation with the requester.
  *
- * Consumes: wsClient (requester_message, scoring_update)
- * Produces: communication state per thread (chat panel, email thread)
+ * Protocol (API_CONTRACTS.md): the client sends `add_ticket_message { ticketId, message }`
+ * over the WebSocket; the server answers with `requester_message`. There is one
+ * server-side thread per ticket and no email concept, so each local message is tagged
+ * with the channel it was written in (chat or email). Email subjects travel inside the
+ * message text ("Subject: …"), and a requester reply lands on the channel the
+ * technician last used.
  *
- * Strict TS: no `any`; use `unknown` + zod parsers at boundaries.
- * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
+ * Strict TS: no `any`; Zod at the boundaries.
  */
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, nanoid, type Dispatch, type PayloadAction } from '@reduxjs/toolkit';
 import { z } from 'zod';
-import type { RootState, AppDispatch } from '../../app/store';
-import { WSEnvelope, ServerEventType, RequesterMessagePayload, ScoringUpdatePayload } from '../../shared/ws/envelope';
+import type { RequesterMessagePayload } from '../../shared/ws/envelope';
+import { AddTicketMessagePayloadSchema } from '../../shared/ws/envelope';
+import { wsSend, ClientEventType } from '../../shared/ws/events';
 
-// ---------------------------------------------------------------------------
-// Zod schemas for WebSocket payload boundaries
-// ---------------------------------------------------------------------------
-
-const RequesterMessageSchema = z.object({
-  ticketId: z.string().uuid(),
-  from: z.enum(['requester', 'system']),
-  message: z.string(),
-  timestamp: z.string().datetime(),
-});
-
-type RequesterMessage = z.infer<typeof RequesterMessageSchema>;
-
-const ScoringUpdateSchema = z.object({
-  ticketId: z.string().uuid(),
-  score: z.number().int().min(0).max(20),
-  feedback: z.string().optional(),
-  timestamp: z.string().datetime(),
-});
-
-type ScoringUpdate = z.infer<typeof ScoringUpdateSchema>;
-
-// ---------------------------------------------------------------------------
-// Communication thread state — mirrors ticket message threading model
-// ---------------------------------------------------------------------------
+export type MessageChannel = 'chat' | 'email';
+export type MessageSender = 'requester' | 'system' | 'technician';
 
 export interface Message {
   id: string;
   ticketId: string;
-  from: 'requester' | 'system';
+  from: MessageSender;
+  channel: MessageChannel;
   text: string;
+  /** Email only. */
+  subject?: string;
   timestamp: string;
+  /** Technician messages only: whether the frame was written to the socket. */
+  delivery?: 'sent' | 'failed';
 }
 
 export interface ThreadState {
@@ -53,21 +39,12 @@ export interface ThreadState {
   error: string | null;
 }
 
-// ---------------------------------------------------------------------------
-// Communication state — one thread per ticket
-// ---------------------------------------------------------------------------
-
 export interface CommunicationState {
-  // Thread map: ticketId -> thread state
+  /** ticketId -> thread */
   threads: Record<string, ThreadState>;
-  // Global status
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
 }
-
-// ---------------------------------------------------------------------------
-// Initial state
-// ---------------------------------------------------------------------------
 
 const initialState: CommunicationState = {
   threads: {},
@@ -75,156 +52,133 @@ const initialState: CommunicationState = {
   error: null,
 };
 
-// ---------------------------------------------------------------------------
-// Communication slice
-// ---------------------------------------------------------------------------
+const EMPTY_THREAD: ThreadState = { messages: [], status: 'idle', error: null };
+
+const ensureThread = (state: CommunicationState, ticketId: string): ThreadState =>
+  (state.threads[ticketId] ??= { messages: [], status: 'succeeded', error: null });
 
 export const communicationSlice = createSlice({
   name: 'communication',
   initialState,
   reducers: {
-    /** Set the entire thread for a ticket */
+    /** Replace the whole thread for a ticket. */
     setThread: (state, action: PayloadAction<{ ticketId: string; thread: ThreadState }>) => {
       state.threads[action.payload.ticketId] = action.payload.thread;
     },
-    /** Add a message to a thread */
+    /** Append a message (creates the thread if needed). */
     addMessage: (state, action: PayloadAction<{ ticketId: string; message: Message }>) => {
-      const thread = state.threads[action.payload.ticketId];
-      if (!thread) {
-        state.threads[action.payload.ticketId] = {
-          messages: [action.payload.message],
-          status: 'succeeded',
-          error: null,
-        };
-      } else {
-        thread.messages.push(action.payload.message);
-      }
+      ensureThread(state, action.payload.ticketId).messages.push(action.payload.message);
     },
-    /** Set thread status */
     setThreadStatus: (state, action: PayloadAction<{ ticketId: string; status: ThreadState['status'] }>) => {
-      if (state.threads[action.payload.ticketId]) {
-        state.threads[action.payload.ticketId].status = action.payload.status;
-      }
+      const thread = state.threads[action.payload.ticketId];
+      if (thread) thread.status = action.payload.status;
     },
-    /** Set thread error — also creates thread entry if missing */
+    /** Set or clear a thread error (creates the thread if needed). */
     setThreadError: (state, action: PayloadAction<{ ticketId: string; error: string | null }>) => {
       const { ticketId, error } = action.payload;
-      if (!state.threads[ticketId]) {
-        state.threads[ticketId] = {
-          messages: [],
-          status: 'idle',
-          error,
-        };
-      } else {
-        state.threads[ticketId].error = error;
-        if (error) {
-          state.threads[ticketId].status = 'failed';
-        } else {
-          state.threads[ticketId].status = 'idle';
-        }
-      }
+      const thread = (state.threads[ticketId] ??= { messages: [], status: 'idle', error: null });
+      thread.error = error;
+      thread.status = error ? 'failed' : 'idle';
     },
-    /** Clear all threads */
     clearThreads: (state) => {
       state.threads = {};
+    },
+    /** A `requester_message` from the server (already Zod-validated by wsMiddleware). */
+    receiveRequesterMessage: {
+      reducer: (state, action: PayloadAction<RequesterMessagePayload & { id: string }>) => {
+        const { id, ticketId, from, message, timestamp } = action.payload;
+        const thread = ensureThread(state, ticketId);
+        const lastOwn = [...thread.messages].reverse().find((m) => m.from === 'technician');
+        const channel: MessageChannel = lastOwn?.channel ?? 'chat';
+        thread.messages.push({
+          id,
+          ticketId,
+          from,
+          channel,
+          text: message,
+          timestamp,
+          ...(channel === 'email' ? { subject: `Re: ${lastOwn?.subject ?? 'your ticket'}` } : {}),
+        });
+      },
+      prepare: (payload: RequesterMessagePayload) => ({ payload: { ...payload, id: nanoid() } }),
     },
   },
 });
 
-// ---------------------------------------------------------------------------
-// Async thunks for WebSocket message handling
-// ---------------------------------------------------------------------------
-
-/** Process incoming requester_message from wsMiddleware */
-export const processRequesterMessage = (
-  message: RequesterMessage,
-  ticketId?: string,
-) => async (dispatch: AppDispatch) => {
-  const validated = RequesterMessageSchema.parse(message);
-
-  if (ticketId && validated.ticketId !== ticketId) {
-    // Message is for a different ticket than specified
-    return;
-  }
-
-  dispatch(
-    communicationSlice.actions.addMessage({
-      ticketId: validated.ticketId,
-      message: {
-        id: crypto.randomUUID(),
-        ticketId: validated.ticketId,
-        from: validated.from,
-        text: validated.message,
-        timestamp: validated.timestamp,
-      },
-    }),
-  );
-};
-
-/** Process incoming scoring_update from wsMiddleware */
-export const processScoringUpdate = (
-  update: ScoringUpdate,
-  ticketId?: string,
-) => async (dispatch: AppDispatch) => {
-  const validated = ScoringUpdateSchema.parse(update);
-
-  if (ticketId && validated.ticketId !== ticketId) {
-    return;
-  }
-
-  // Scoring updates don't add messages to the thread,
-  // they update the ticket scoring visible in the UI
-  dispatch(
-    communicationSlice.actions.setThread({
-      ticketId: validated.ticketId,
-      thread: {
-        messages: [],
-        status: 'succeeded',
-        error: null,
-      },
-    }),
-  );
-};
+export const { setThread, addMessage, setThreadStatus, setThreadError, clearThreads, receiveRequesterMessage } =
+  communicationSlice.actions;
 
 // ---------------------------------------------------------------------------
-// Selectors
+// Sending
 // ---------------------------------------------------------------------------
 
-/** Get thread state for a ticket */
-export const selectThread = (state: RootState, ticketId: string) => {
-  return state.communication.threads[ticketId] ?? {
-    messages: [],
-    status: 'idle',
-    error: null,
+const ChatInputSchema = z.object({ text: z.string().trim().min(1, 'Message is empty').max(1000, 'Message is over 1000 characters') });
+const EmailInputSchema = z.object({
+  subject: z.string().trim().min(1, 'Subject is empty').max(200, 'Subject is over 200 characters'),
+  text: z.string().trim().min(1, 'Body is empty').max(2000, 'Body is over 2000 characters'),
+});
+
+export type SendTicketMessageInput =
+  | { ticketId: string; channel: 'chat'; text: string }
+  | { ticketId: string; channel: 'email'; subject: string; text: string };
+
+export type SendResult = { ok: true; delivered: boolean } | { ok: false; error: string };
+
+/**
+ * Validate and send a technician message as `add_ticket_message`. While the socket
+ * is down nothing is sent; the message is kept locally and marked as failed.
+ */
+export const sendTicketMessage =
+  (input: SendTicketMessageInput) =>
+  (dispatch: Dispatch, getState: () => { ws: { connected: boolean } }): SendResult => {
+    let text: string;
+    let subject: string | undefined;
+    if (input.channel === 'email') {
+      const parsed = EmailInputSchema.safeParse(input);
+      if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid email' };
+      ({ text, subject } = parsed.data);
+    } else {
+      const parsed = ChatInputSchema.safeParse(input);
+      if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid message' };
+      ({ text } = parsed.data);
+    }
+
+    const wire = AddTicketMessagePayloadSchema.safeParse({
+      ticketId: input.ticketId,
+      message: subject === undefined ? text : `Subject: ${subject}\n\n${text}`,
+    });
+    if (!wire.success) return { ok: false, error: 'Invalid ticket id' };
+
+    const delivered = getState().ws.connected;
+    if (delivered) {
+      dispatch(wsSend({ type: ClientEventType.ADD_TICKET_MESSAGE, payload: wire.data }));
+    }
+    dispatch(
+      addMessage({
+        ticketId: input.ticketId,
+        message: {
+          id: nanoid(),
+          ticketId: input.ticketId,
+          from: 'technician',
+          channel: input.channel,
+          text,
+          ...(subject === undefined ? {} : { subject }),
+          timestamp: new Date().toISOString(),
+          delivery: delivered ? 'sent' : 'failed',
+        },
+      })
+    );
+    return { ok: true, delivered };
   };
-};
-
-/** Get all thread messages for a ticket */
-export const selectThreadMessages = (state: RootState, ticketId: string) => {
-  const thread = selectThread(state, ticketId);
-  return thread.messages;
-};
-
-/** Get thread status for a ticket */
-export const selectThreadStatus = (state: RootState, ticketId: string) => {
-  return selectThread(state, ticketId).status;
-};
-
-/** Get thread error for a ticket */
-export const selectThreadError = (state: RootState, ticketId: string) => {
-  return selectThread(state, ticketId).error;
-};
 
 // ---------------------------------------------------------------------------
-// Action exports
+// Selectors (state shape kept minimal so they work with any store containing the slice)
 // ---------------------------------------------------------------------------
 
-export const {
-  setThread,
-  addMessage,
-  setThreadStatus,
-  setThreadError,
-  clearThreads,
-} = communicationSlice.actions;
+type WithCommunication = { communication: CommunicationState };
+
+/** Thread for a ticket; a shared empty thread when there is none (stable reference). */
+export const selectThread = (state: WithCommunication, ticketId: string): ThreadState =>
+  state.communication.threads[ticketId] ?? EMPTY_THREAD;
 
 export default communicationSlice.reducer;

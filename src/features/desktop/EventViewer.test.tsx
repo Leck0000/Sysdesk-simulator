@@ -10,18 +10,19 @@ import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { desktopSlice } from './slice';
+import wsReducer, { initialWSState } from '../../shared/ws/slice';
 import { EventViewer } from './EventViewer';
 
 // Mock window.matchMedia for responsive tests
-global.matchMedia = global.matchMedia || ((params: string) => ({
+globalThis.matchMedia = globalThis.matchMedia || ((params: string) => ({
   matches: false,
   media: params,
   onchange: null,
-  addListener: jest.fn(),
-  removeListener: jest.fn(),
-  addEventListener: jest.fn(),
-  removeEventListener: jest.fn(),
-  dispatchEvent: jest.fn(),
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
 }));
 
 // Mock the ws module
@@ -42,12 +43,9 @@ vi.mock('../shared/ws', () => ({
 const store = configureStore({
   reducer: {
     desktop: desktopSlice.reducer,
-    // Mock ws state
-    ws: {
-      reducer: () => ({ state: { sessionId: 'test-session' } }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any,
+    ws: wsReducer,
   },
+  preloadedState: { ws: { ...initialWSState, sessionId: 'test-session' } },
 });
 
 describe('EventViewer', () => {
@@ -62,7 +60,7 @@ describe('EventViewer', () => {
         <EventViewer windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('event-viewer');
+    const component = screen.getByTestId('EventViewer');
     expect(component).toBeInTheDocument();
   });
 
@@ -72,7 +70,7 @@ describe('EventViewer', () => {
         <EventViewer windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('event-viewer');
+    const component = screen.getByTestId('EventViewer');
     expect(component).toHaveStyle('background-color: var(--card)');
     expect(component).toHaveStyle('color: var(--fg)');
   });
@@ -83,8 +81,8 @@ describe('EventViewer', () => {
         <EventViewer windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('event-viewer');
-    expect(component).toHaveAttribute('role', 'dialog');
+    const component = screen.getByTestId('EventViewer');
+    expect(component).toHaveAttribute('role', 'region');
   });
 
   test('displays loading state initially', () => {
@@ -105,7 +103,7 @@ describe('EventViewer', () => {
       </Provider>
     );
     // Component structure check
-    const container = screen.getByTestId('event-viewer');
+    const container = screen.getByTestId('EventViewer');
     expect(container).toBeInTheDocument();
   });
 });

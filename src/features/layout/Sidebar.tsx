@@ -1,302 +1,179 @@
 /**
- * Sidebar component — collapsible sidebar with navigation and ticket queue summary
+ * Sidebar — ticket filters, queue summary and the Windows tools launcher.
  *
- * Consumes: ticketsSlice (queue state, filters), authSlice (role-based visibility),
- *            theme CSS vars (--fg, --bg, --accent, --border, --card)
- * Produces: Sidebar — React component with navigation links and queue summary
+ * Consumes: ticketsSlice (filters, queue counts)
+ * Produces: Sidebar — fixed column at >=1024px; off-canvas drawer below that
  *
- * Strict TS: no `any`; use `unknown` + zod parsers at boundaries.
- * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
- * Accessibility: WCAG 2.1 AA (focus-visible, aria-labels, reduced motion)
- * Responsive: fixed width on >=1280px, collapses to drawer <1024px
+ * Strict TS: no `any`; select values are narrowed with type guards.
+ * CSS variables for theming via Tailwind tokens (bg-card, text-fg, border-border, ...).
+ * Accessibility: labelled controls, focus-visible rings, Escape closes the drawer.
  */
-import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { selectFilteredQueue, selectQueueCounts, selectPriorityCounts } from '../../features/tickets/slice';
-import { setFilters, clearFilters as clearFiltersAction } from '../../features/tickets/slice';
-import { WindowsAppsLauncher } from '../../features/desktop/windows-apps-launcher';
+import React, { useEffect } from 'react';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { selectQueueCounts, setFilters, clearFilters, type Ticket } from '../tickets/slice';
+import { WindowsAppsLauncher } from '../desktop/WindowsAppsLauncher';
 
-export function Sidebar() {
-  const dispatch = useDispatch();
-  const filteredQueue = useSelector(selectFilteredQueue);
-  const queueCounts = useSelector(selectQueueCounts);
+const QUEUES = ['AD', 'networking', 'security', 'helpdesk'] as const;
+const STATES = ['open', 'in_progress', 'on_hold', 'resolved', 'closed'] as const;
+const PRIORITIES = ['critical', 'high', 'medium', 'low'] as const;
 
-  // Determine if we're in drawer mode (viewport < 1024px)
-  const [isDrawerMode, setIsDrawerMode] = useState(false);
+const QUEUE_LABELS: Record<Ticket['queue'], string> = {
+  AD: 'Active Directory',
+  networking: 'Networking',
+  security: 'Security',
+  helpdesk: 'Helpdesk',
+};
+const STATE_LABELS: Record<Ticket['state'], string> = {
+  open: 'Open',
+  in_progress: 'In progress',
+  on_hold: 'On hold',
+  resolved: 'Resolved',
+  closed: 'Closed',
+};
+
+/** Narrow a <select> value to one of `options`, or undefined for "All". */
+function pick<T extends string>(options: readonly T[], value: string): T | undefined {
+  return options.find((o) => o === value);
+}
+
+const selectClass =
+  'w-full rounded border border-border bg-card p-1.5 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent';
+
+export interface SidebarProps {
+  /** Drawer state below 1024px; ignored on wide screens. */
+  open: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ open, onClose }: SidebarProps) {
+  const dispatch = useAppDispatch();
+  const filters = useAppSelector((state) => state.tickets.filters);
+  const queueCounts = useAppSelector(selectQueueCounts);
+
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1023px)');
-    setIsDrawerMode(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsDrawerMode(e.matches);
-    mq.addEventListener?.('change', handler);
-    return () => mq.removeEventListener?.('change', handler);
-  }, []);
-
-  const [collapsed, setCollapsed] = useState(false);
-  const handleToggleCollapse = () => setCollapsed(!collapsed);
-  const handleClearFilters = () => {
-    dispatch(clearFiltersAction());
-    if (isDrawerMode) setCollapsed(false);
-    else setCollapsed(false);
-  };
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   return (
-    <aside
-      className={`sidebar flex flex-col ${collapsed ? 'collapsed' : 'expanded'} bg-var(--card) border-r border-var(--border) h-full transition-width ${isDrawerMode ? 'drawer-mode' : ''}`}
-      onClick={handleToggleCollapse}
-    >
-      <div className="p-4 border-b border-var(--border) flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-var(--fg)">
-          {isDrawerMode ? 'Menu' : (collapsed ? 'M' : 'Ticket Queue')}
-        </h2>
-        <button
-          onClick={handleToggleCollapse}
-          className="p-1 rounded hover:bg-var(--muted) transition-colors"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? '▶' : '◀'}
-        </button>
-      </div>
-
-      {/* Collapsed mode: just show the toggle and summary */}
-      {collapsed && (!isDrawerMode && (
-        <div className="p-3 flex-1 flex flex-col justify-end">
-          <div className="flex items-center gap-2 text-sm text-var(--muted)">
-            <span>{queueCounts.open || 0} Open</span>
-            <span>{queueCounts.in_progress || 0} IP</span>
-            <span>{queueCounts.resolved || 0} Resolved</span>
-            <span>{queueCounts.closed || 0} Closed</span>
-          </div>
-        </div>
-      ))}
-
-      {/* Drawer mode: toggleable slide-in sidebar */}
-      {isDrawerMode && collapsed && (
+    <>
+      {open && (
         <div
-          className="fixed inset-0 z-20 bg-black/40 backdrop-blur-sm transition-opacity"
-          onClick={handleToggleCollapse}
-          aria-label="Close sidebar drawer"
+          className="fixed inset-0 z-30 bg-bg/60 lg:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+          data-testid="sidebar-backdrop"
         />
       )}
+      <aside
+        data-testid="sidebar"
+        aria-label="Sidebar"
+        className={`sidebar fixed inset-y-0 left-0 z-40 w-64 shrink-0 overflow-y-auto border-r border-border bg-card p-3 transition-transform lg:static lg:z-auto lg:translate-x-0 ${
+          open ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <section aria-labelledby="filters-heading" className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 id="filters-heading" className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Filters
+            </h2>
+            <button
+              type="button"
+              onClick={() => dispatch(clearFilters())}
+              className="text-xs text-muted underline hover:text-accent"
+            >
+              Clear
+            </button>
+          </div>
 
-      {/* Expanded mode: full filter controls */}
-      {!collapsed && (!isDrawerMode && (
-        <div className="p-3 flex-1 overflow-y-auto">
-          {/* Queue filter */}
-          <div className="mb-3">
-            <label className="block text-xs text-var(--muted) mb-1">Queue</label>
+          <label className="block text-xs text-muted">
+            Queue
             <select
-              onChange={(e) =>
-                dispatch(setFilters({ queue: e.target.value as any }))
-              }
-              className="w-full rounded border border-var(--border) bg-var(--card) p-1 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
+              className={selectClass}
+              value={filters.queue ?? ''}
+              onChange={(e) => dispatch(setFilters({ queue: pick(QUEUES, e.target.value) }))}
               aria-label="Filter tickets by queue"
             >
-              <option value="">All</option>
-              <option value="AD">AD</option>
-              <option value="networking">Net</option>
-              <option value="security">Sec</option>
-              <option value="helpdesk">HD</option>
+              <option value="">All queues</option>
+              {QUEUES.map((q) => (
+                <option key={q} value={q}>
+                  {QUEUE_LABELS[q]}
+                </option>
+              ))}
             </select>
-          </div>
+          </label>
 
-          {/* State filter */}
-          <div className="mb-3">
-            <label className="block text-xs text-var(--muted) mb-1">State</label>
+          <label className="block text-xs text-muted">
+            State
             <select
-              onChange={(e) =>
-                dispatch(setFilters({ state: e.target.value as any }))
-              }
-              className="w-full rounded border border-var(--border) bg-var(--card) p-1 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
+              className={selectClass}
+              value={filters.state ?? ''}
+              onChange={(e) => dispatch(setFilters({ state: pick(STATES, e.target.value) }))}
               aria-label="Filter tickets by state"
             >
-              <option value="">All</option>
-              <option value="open">Open</option>
-              <option value="in_progress">IP</option>
-              <option value="on_hold">OH</option>
-              <option value="resolved">Resolved</option>
-              <option value="closed">Closed</option>
+              <option value="">All states</option>
+              {STATES.map((s) => (
+                <option key={s} value={s}>
+                  {STATE_LABELS[s]}
+                </option>
+              ))}
             </select>
-          </div>
+          </label>
 
-          {/* Priority filter */}
-          <div className="mb-3">
-            <label className="block text-xs text-var(--muted) mb-1">Priority</label>
+          <label className="block text-xs text-muted">
+            Priority
             <select
-              onChange={(e) =>
-                dispatch(setFilters({ priority: e.target.value as any }))
-              }
-              className="w-full rounded border border-var(--border) bg-var(--card) p-1 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
+              className={selectClass}
+              value={filters.priority ?? ''}
+              onChange={(e) => dispatch(setFilters({ priority: pick(PRIORITIES, e.target.value) }))}
               aria-label="Filter tickets by priority"
             >
-              <option value="">All</option>
-              <option value="critical">Crit</option>
-              <option value="high">High</option>
-              <option value="medium">Med</option>
-              <option value="low">Low</option>
+              <option value="">All priorities</option>
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {p[0]?.toUpperCase()}
+                  {p.slice(1)}
+                </option>
+              ))}
             </select>
-          </div>
+          </label>
 
-          {/* Assigned to me */}
-          <div className="mb-3">
-            <label className="flex items-center text-xs text-var(--muted) cursor-pointer">
-              <input
-                type="checkbox"
-                onChange={(e) =>
-                  dispatch(
-                    setFilters({
-                      assignedToMe: e.target.checked,
-                    })
-                  )
-                }
-              className="rounded border border-var(--border) bg-var(--card) p-1 focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
-              aria-label="Show only tickets assigned to me"
-              /> Assigned to me
-            </label>
-          </div>
+          <label className="flex items-center gap-2 text-xs text-muted">
+            <input
+              type="checkbox"
+              checked={filters.assignedToMe ?? false}
+              onChange={(e) => dispatch(setFilters({ assignedToMe: e.target.checked }))}
+              className="accent-accent"
+            />
+            Assigned to me
+          </label>
+        </section>
 
-          {/* Queue stats */}
-          <div className="mt-4 pt-3 border-t border-var(--border)">
-            <p className="text-xs text-var(--muted) mb-2">Queue Summary</p>
-            <div className="flex items-center gap-1">
-              <span className="text-var(--accent) font-medium">{queueCounts.open || 0}</span>
-              <span className="text-var(--muted)">Open</span>
-            </div>
-            <div className="flex items-center gap-1 my-1">
-              <span className="text-var(--muted) font-medium">{queueCounts.in_progress || 0}</span>
-              <span className="text-var(--muted)">In Progress</span>
-            </div>
-            <div className="flex items-center gap-1 my-1">
-              <span className="text-var(--muted) font-medium">{queueCounts.resolved || 0}</span>
-              <span className="text-var(--muted)">Resolved</span>
-            </div>
-          </div>
+        <section aria-labelledby="summary-heading" className="mt-5 border-t border-border pt-3">
+          <h2 id="summary-heading" className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
+            Queue summary
+          </h2>
+          <dl className="grid grid-cols-2 gap-1 text-sm">
+            {STATES.map((s) => (
+              <React.Fragment key={s}>
+                <dt className="text-muted">{STATE_LABELS[s]}</dt>
+                <dd className="text-right font-medium text-fg">{queueCounts[s] ?? 0}</dd>
+              </React.Fragment>
+            ))}
+          </dl>
+        </section>
 
-          {/* Windows Apps launcher */}
-          <div className="mt-4 pt-3 border-t border-var(--border)">
-            <p className="text-xs text-var(--muted) mb-2">Tools</p>
-            <WindowsAppsLauncher />
-          </div>
-        </div>
-      ))}
-
-      {/* Drawer content: visible when drawer is open */}
-      {isDrawerMode && !collapsed && (
-        <div
-          className="fixed top-0 left-0 bottom-0 w-64 bg-var(--card) shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-30"
-          aria-label="Sidebar drawer"
-        >
-          <div className="p-4 border-b border-var(--border)">
-            <h2 className="text-lg font-semibold text-var(--fg)">
-              Menu
-              <button
-                onClick={handleToggleCollapse}
-                className="absolute right-2 p-1 rounded hover:bg-var(--muted) transition-colors"
-                aria-label="Close sidebar drawer"
-              >
-                ✕
-              </button>
-            </h2>
-          </div>
-
-          <div className="p-3 overflow-y-auto">
-            {/* Queue filter */}
-            <div className="mb-3">
-              <label className="block text-xs text-var(--muted) mb-1">Queue</label>
-              <select
-                onChange={(e) =>
-                  dispatch(setFilters({ queue: e.target.value as any }))
-                }
-                className="w-full rounded border border-var(--border) bg-var(--card) p-1 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
-                aria-label="Filter tickets by queue"
-              >
-                <option value="">All</option>
-                <option value="AD">AD</option>
-                <option value="networking">Net</option>
-                <option value="security">Sec</option>
-                <option value="helpdesk">HD</option>
-              </select>
-            </div>
-
-            {/* State filter */}
-            <div className="mb-3">
-              <label className="block text-xs text-var(--muted) mb-1">State</label>
-              <select
-                onChange={(e) =>
-                  dispatch(setFilters({ state: e.target.value as any }))
-                }
-                className="w-full rounded border border-var(--border) bg-var(--card) p-1 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
-                aria-label="Filter tickets by state"
-              >
-                <option value="">All</option>
-                <option value="open">Open</option>
-                <option value="in_progress">IP</option>
-                <option value="on_hold">OH</option>
-                <option value="resolved">Resolved</option>
-                <option value="closed">Closed</option>
-              </select>
-            </div>
-
-            {/* Priority filter */}
-            <div className="mb-3">
-              <label className="block text-xs text-var(--muted) mb-1">Priority</label>
-              <select
-                onChange={(e) =>
-                  dispatch(setFilters({ priority: e.target.value as any }))
-                }
-                className="w-full rounded border border-var(--border) bg-var(--card) p-1 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
-                aria-label="Filter tickets by priority"
-              >
-                <option value="">All</option>
-                <option value="critical">Crit</option>
-                <option value="high">High</option>
-                <option value="medium">Med</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-
-            {/* Assigned to me */}
-            <div className="mb-3">
-              <label className="flex items-center text-xs text-var(--muted) cursor-pointer">
-                <input
-                  type="checkbox"
-                  onChange={(e) =>
-                    dispatch(
-                      setFilters({
-                        assignedToMe: e.target.checked,
-                      })
-                    )
-                  }
-                className="rounded border border-var(--border) bg-var(--card) p-1 focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
-                aria-label="Show only tickets assigned to me"
-                /> Assigned to me
-              </label>
-            </div>
-
-            {/* Queue stats */}
-            <div className="mt-4 pt-3 border-t border-var(--border)">
-              <p className="text-xs text-var(--muted) mb-2">Queue Summary</p>
-              <div className="flex items-center gap-1">
-                <span className="text-var(--accent) font-medium">{queueCounts.open || 0}</span>
-                <span className="text-var(--muted)">Open</span>
-              </div>
-              <div className="flex items-center gap-1 my-1">
-                <span className="text-var(--muted) font-medium">{queueCounts.in_progress || 0}</span>
-                <span className="text-var(--muted)">In Progress</span>
-              </div>
-              <div className="flex items-center gap-1 my-1">
-                <span className="text-var(--muted) font-medium">{queueCounts.resolved || 0}</span>
-                <span className="text-var(--muted)">Resolved</span>
-              </div>
-            </div>
-
-            {/* Windows Apps launcher */}
-            <div className="mt-4 pt-3 border-t border-var(--border)">
-              <p className="text-xs text-var(--muted) mb-2">Tools</p>
-              <WindowsAppsLauncher />
-            </div>
-          </div>
-        </div>
-      )}
-    </aside>
+        <section aria-labelledby="tools-heading" className="mt-5 border-t border-border pt-3">
+          <h2 id="tools-heading" className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
+            Tools
+          </h2>
+          <WindowsAppsLauncher />
+        </section>
+      </aside>
+    </>
   );
 }

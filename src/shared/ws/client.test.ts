@@ -1,156 +1,191 @@
 /**
- * WebSocket Client Tests
- * 
- * TDD: Test-driven development for the WSClient infrastructure.
- * Tests cover envelope parsing, connection, message handling, 
- * reconnection, heartbeat, and sequence acknowledgment.
+ * WSClient tests. Protocol (ARCHITECTURE.md §5.6): the client acks every server
+ * `seq` with `client.ack`; `heartbeat` flows both ways; the server never acks
+ * client frames (it retransmits on gaps), so the client must not retransmit.
  */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { UnknownAction } from '@reduxjs/toolkit';
 import { WSClient } from './client';
-import { WSEnvelope, parseEnvelope, createEnvelope } from './envelope';
-import { ServerEventType, ClientEventType } from './events';
+import { parseEnvelope, createEnvelope } from './envelope';
+import { ServerEventType, ClientEventType, WSActionType } from './events';
 import type { WSClientConfig } from './client';
+import { FakeSocket } from '../../test/fakeWebSocket';
 
-describe('WSClient Infrastructure', () => {
+const SESSION_ID = '1b84c7d2-9b0e-4527-bd82-ef0c2f5b6a1d';
+
+describe('WSClient', () => {
   let client: WSClient;
+  let actions: UnknownAction[];
   const config: WSClientConfig = {
     url: 'ws://localhost:8080/ws',
     accessToken: 'test-token-123',
+    heartbeatInterval: 1_000,
+    maxMissedHeartbeats: 2,
   };
 
+  /** Connect over a FakeSocket and complete the session.init handshake. */
+  function connect(): FakeSocket {
+    void client.connect();
+    const socket = FakeSocket.last;
+    if (!socket) throw new Error('no socket');
+    socket.onopen?.();
+    socket.receive(ServerEventType.SESSION_INIT, { sessionId: SESSION_ID, userPrincipal: 'tech1', caps: ['terminal'] }, 1);
+    socket.send.mockClear();
+    actions.length = 0;
+    return socket;
+  }
+
   beforeEach(() => {
-    // Reset singleton before each test
+    vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', FakeSocket);
+    FakeSocket.last = null;
     WSClient.resetInstance();
     client = WSClient.getInstance(config);
+    actions = [];
+    client.setStore((a) => actions.push(a), () => ({ auth: {} }));
   });
 
   afterEach(() => {
-    client.destroy();
     WSClient.resetInstance();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
-  describe('envelope parsing', () => {
-    it('should parse a valid WS envelope', () => {
-      const envelope = createEnvelope(ClientEventType.CLIENT_ACK, { seq: 1 }, '1b84c7d2-9b0e-4527-bd82-ef0c2f5b6a1d', 1);
-      const parsed = parseEnvelope(envelope);
-      expect(parsed).not.toBeNull();
+  describe('envelopes and event types', () => {
+    it('parses a valid envelope and rejects invalid ones', () => {
+      const parsed = parseEnvelope(createEnvelope(ClientEventType.CLIENT_ACK, { seq: 1 }, SESSION_ID, 1));
       expect(parsed?.t).toBe('client.ack');
       expect(parsed?.seq).toBe(1);
+      expect(parseEnvelope({})).toBeNull();
+      expect(parseEnvelope({ v: 0 })).toBeNull();
     });
 
-    it('should return null for invalid JSON', () => {
-      const result = parseEnvelope({} as any);
-      expect(result).toBeNull();
-    });
-
-    it('should return null for missing required fields', () => {
-      const result = parseEnvelope({ v: 0 } as any);
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('ClientEventType and ServerEventType', () => {
-    it('should have all expected server event types', () => {
+    it('defines the protocol event names, with heartbeat in both directions', () => {
       expect(ServerEventType.SESSION_INIT).toBe('session.init');
       expect(ServerEventType.HEARTBEAT).toBe('heartbeat');
       expect(ServerEventType.CMD_RESULT).toBe('cmd.result');
-    });
-
-    it('should have all expected client event types', () => {
       expect(ClientEventType.CLIENT_ACK).toBe('client.ack');
       expect(ClientEventType.AUTHENTICATE).toBe('authenticate');
       expect(ClientEventType.SEND_COMMAND).toBe('send_command');
+      expect(ClientEventType.HEARTBEAT).toBe('heartbeat');
     });
   });
 
-  describe('WSClient singleton', () => {
-    it('should return the same instance on repeated calls', () => {
-      const client1 = WSClient.getInstance(config);
-      const client2 = WSClient.getInstance();
-      expect(client1).toBe(client2);
+  describe('singleton', () => {
+    it('returns the same instance on repeated calls', () => {
+      expect(WSClient.getInstance()).toBe(client);
     });
 
-    it('should allow resetting the singleton', () => {
+    it('requires config again after reset', () => {
       WSClient.resetInstance();
-      expect(WSClient.instance).toBeNull();
+      expect(() => WSClient.getInstance()).toThrow('WSClient not initialized');
     });
   });
 
-  describe('WSClient connection', () => {
-    it('should be created with config', () => {
-      expect(client).toBeDefined();
-    });
-
-    it('should have default config values', () => {
+  describe('connection', () => {
+    it('starts CLOSED and rejects connect cleanly when the socket errors', async () => {
       expect(client.readyState).toBe(WebSocket.CLOSED);
+      const p = client.connect();
+      FakeSocket.last?.onerror?.(new Event('error'));
+      await expect(p).rejects.toThrow('WebSocket error');
     });
 
-    it('should track session ID after connection', async () => {
-      // Connection will fail in test environment (no server),
-      // but we test the structure
-      const connectPromise = client.connect();
-      // Connection should reject or resolve depending on server
-      // Just verify the promise exists
-      expect(connectPromise).toBeInstanceOf(Promise);
+    it('authenticates on open and resolves with session.init (caps)', async () => {
+      const p = client.connect();
+      const socket = FakeSocket.last;
+      socket?.onopen?.();
+      expect(socket?.frames()[0]).toMatchObject({ t: 'authenticate', payload: { token: 'test-token-123' } });
+      socket?.receive(ServerEventType.SESSION_INIT, { sessionId: SESSION_ID, userPrincipal: 'tech1', caps: ['terminal', 'ad'] }, 1);
+      await expect(p).resolves.toEqual({ sessionId: SESSION_ID, capabilities: ['terminal', 'ad'] });
+      expect(actions).toContainEqual({ type: WSActionType.CONNECTED, payload: { sessionId: SESSION_ID, capabilities: ['terminal', 'ad'] } });
+      expect(client.getSessionId()).toBe(SESSION_ID);
+    });
+
+    it('reports an invalid session.init instead of connecting', () => {
+      void client.connect().catch(() => {});
+      FakeSocket.last?.onopen?.();
+      FakeSocket.last?.receive(ServerEventType.SESSION_INIT, { sessionId: 'not-a-uuid' }, 1);
+      expect(actions.some((a) => a.type === WSActionType.CONNECTED)).toBe(false);
+      expect(actions.some((a) => a.type === WSActionType.ERROR)).toBe(true);
     });
   });
 
-  describe('WSClient message sending', () => {
-    it('should reject send when not connected', () => {
-      // Should not throw, just return rejected promise
-      let error: Error | null = null;
-      try {
-        client.send(ClientEventType.HEARTBEAT, {});
-      } catch (e) {
-        error = e as Error;
+  describe('sending', () => {
+    it('throws when not connected and does not consume a seq', () => {
+      expect(() => client.send(ClientEventType.HEARTBEAT, {})).toThrow('WebSocket not connected');
+      const socket = connect();
+      client.send(ClientEventType.SEND_COMMAND, { machineId: SESSION_ID, command: 'ipconfig' });
+      // seq 1 was authenticate, then the ack for session.init; a failed send consumed nothing
+      expect(socket.frames()[0]?.seq).toBe(3);
+    });
+
+    it('writes each frame exactly once — no client-side retransmission', () => {
+      const socket = connect();
+      client.send(ClientEventType.SEND_COMMAND, { machineId: SESSION_ID, command: 'ipconfig' });
+      vi.advanceTimersByTime(60_000);
+      const commands = socket.frames().filter((f) => f.t === 'send_command');
+      expect(commands).toHaveLength(1);
+      expect(actions.some((a) => a.type === WSActionType.ERROR)).toBe(false);
+    });
+  });
+
+  describe('acknowledgment', () => {
+    it('acks each server message with client.ack { seq }', () => {
+      const socket = connect();
+      socket.receive(ServerEventType.CMD_RESULT, { cmdId: 'c1', exitCode: 0, stdout: '', stderr: '' }, 7);
+      expect(socket.frames()).toContainEqual(expect.objectContaining({ t: 'client.ack', payload: { seq: 7 } }));
+    });
+
+    it('acking while disconnected is a no-op', () => {
+      expect(() => client.ack(1)).not.toThrow();
+    });
+  });
+
+  describe('heartbeat', () => {
+    it('sends heartbeat frames on the interval', () => {
+      const socket = connect();
+      vi.advanceTimersByTime(1_000);
+      expect(socket.frames().filter((f) => f.t === 'heartbeat')).toHaveLength(1);
+    });
+
+    it('a server heartbeat resets the missed count', () => {
+      const socket = connect();
+      for (let i = 0; i < 5; i++) {
+        vi.advanceTimersByTime(1_000);
+        socket.receive(ServerEventType.HEARTBEAT, {}, 10 + i);
       }
-      // In CLOSED state, send should handle gracefully by throwing
-      expect(error).not.toBeNull();
-      expect(error?.message).toBe('WebSocket not connected');
+      expect(socket.close).not.toHaveBeenCalled();
     });
 
-    it('should maintain seq counter when not connected', () => {
-      // When send() fails due to not being connected, seq is not incremented
-      // (the readyState check happens before ++this.seq)
-      expect(client.seq).toBe(0);
-    });
-  });
-
-  describe('WSClient acknowledgment', () => {
-    it('should send ack for a sequence', () => {
-      // ack method should work even without a connection
-      client.ack(1);
-      // Just verify it doesn't throw
+    it('closes with an application code (not reserved 1006) after too many missed heartbeats', () => {
+      const socket = connect();
+      vi.advanceTimersByTime(3_000);
+      expect(socket.close).toHaveBeenCalledTimes(1);
+      const code = socket.close.mock.calls[0]?.[0] ?? 0;
+      expect(code).toBeGreaterThanOrEqual(4000);
+      expect(code).toBeLessThanOrEqual(4999);
+      expect(actions.some((a) => a.type === WSActionType.HEARTBEAT_MISSED)).toBe(true);
     });
   });
 
-  describe('WSClient heartbeat', () => {
-    it('should start and stop heartbeat', () => {
-      // startHeartbeat is private, test via public interface
-      // Connect will start heartbeat, disconnect should stop it
-      client.disconnect();
-      expect(client.readyState).toBe(WebSocket.CLOSED);
-    });
-
-    it('should track missed heartbeats', () => {
-      // Test the missedHeartbeats counter
-      client.missedHeartbeats = 0;
-      expect(client.missedHeartbeats).toBe(0);
-    });
-  });
-
-  describe('WSClient reconnection', () => {
-    it('should track reconnection attempts', () => {
-      client.reconnectAttempt = 0;
-      expect(client.reconnectAttempt).toBe(0);
-    });
-
-    it('should emit reconnecting event', () => {
+  describe('reconnection', () => {
+    it('reconnects with backoff after an unexpected close', () => {
       const listener = vi.fn();
       client.on('reconnecting', listener);
-      client.emit('reconnecting', 1, 1000);
-      expect(listener).toHaveBeenCalledWith(1, 1000);
+      const first = connect();
+      first.drop();
+      expect(listener).toHaveBeenCalledWith(1, expect.any(Number));
+      expect(actions.some((a) => a.type === WSActionType.DISCONNECTED)).toBe(true);
+      vi.advanceTimersByTime(30_000);
+      expect(FakeSocket.last).not.toBe(first);
+    });
+
+    it('does not reconnect after an intentional disconnect', () => {
+      const listener = vi.fn();
+      client.on('reconnecting', listener);
+      connect();
+      client.disconnect();
+      expect(listener).not.toHaveBeenCalled();
     });
   });
 });

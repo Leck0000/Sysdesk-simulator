@@ -8,8 +8,10 @@
  * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
  */
 
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { apiBaseQuery } from '../../shared/api/baseQuery';
 import { z } from 'zod';
+import type { RootState } from '../../app/store';
 
 // ---------------------------------------------------------------------------
 // Zod schemas (boundary validation — never pass raw network data downstream)
@@ -37,7 +39,7 @@ const TicketSchema = z.object({
 });
 
 /** List tickets query params */
-const ListTicketsParamsSchema = z.object({
+export const ListTicketsParamsSchema = z.object({
   queue: z.enum(['AD', 'networking', 'security', 'helpdesk']).optional(),
   state: z.enum(['open', 'in_progress', 'on_hold', 'resolved', 'closed']).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
@@ -112,24 +114,16 @@ export type UpdateTicketResponse = z.infer<typeof UpdateTicketResponseSchema>;
 
 export const ticketsApi = createApi({
   reducerPath: 'ticketsApi',
-  baseQuery: fetchBaseQuery({
-    // Inject auth token from Redux store via prepareHeaders
-    prepareHeaders: (headers, { getState }) => {
-      const state = getState();
-      const accessToken = (state && typeof state === 'object' && 'auth' in state && typeof (state as { auth: { accessToken: string } }).auth.accessToken === 'string')
-        ? (state as { auth: { accessToken: string } }).auth.accessToken
-        : '';
-      if (accessToken) {
-        headers.set('Authorization', `Bearer ${accessToken}`);
-      }
-      return headers;
-    },
-    credentials: 'include',
-  }),
+  baseQuery: apiBaseQuery,
   tagTypes: ['Ticket', 'TicketList'],
   endpoints: (builder) => ({
     /** GET /tickets — list with optional filters */
     listTickets: builder.query<ListTicketsResponse, ListTicketsParams | void>({
+      // Validate the server response (and args) at the boundary.
+      // Schema has defaults (input != output): validate the raw body (handled SchemaError on
+      // mismatch), then parse to apply defaults and get the output type.
+      rawResponseSchema: ListTicketsResponseSchema,
+      transformResponse: (raw: unknown) => ListTicketsResponseSchema.parse(raw),
       query: (params) => ({
         url: '/tickets',
         method: 'GET',
@@ -146,6 +140,11 @@ export const ticketsApi = createApi({
 
     /** GET /tickets/:id — get single ticket */
     getTicket: builder.query<TicketResponse, string>({
+      // Validate the server response (and args) at the boundary.
+      // Schema has defaults (input != output): validate the raw body (handled SchemaError on
+      // mismatch), then parse to apply defaults and get the output type.
+      rawResponseSchema: TicketResponseSchema,
+      transformResponse: (raw: unknown) => TicketResponseSchema.parse(raw),
       query: (id) => ({
         url: `/tickets/${id}`,
         method: 'GET',
@@ -155,6 +154,12 @@ export const ticketsApi = createApi({
 
     /** POST /tickets/:id/claim — claim ticket for current technician */
     claimTicket: builder.mutation<ClaimTicketResponse, ClaimTicketRequest>({
+      // Validate the server response (and args) at the boundary.
+      // Schema has defaults (input != output): validate the raw body (handled SchemaError on
+      // mismatch), then parse to apply defaults and get the output type.
+      rawResponseSchema: ClaimTicketResponseSchema,
+      transformResponse: (raw: unknown) => ClaimTicketResponseSchema.parse(raw),
+      argSchema: ClaimTicketRequestSchema,
       query: ({ ticketId }) => ({
         url: `/tickets/${ticketId}/claim`,
         method: 'POST',
@@ -167,6 +172,9 @@ export const ticketsApi = createApi({
 
     /** POST /tickets/:id/messages — add message to ticket */
     addMessage: builder.mutation<AddMessageResponse, AddMessageRequest>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: AddMessageResponseSchema,
+      argSchema: AddMessageRequestSchema,
       query: ({ ticketId, message }) => ({
         url: `/tickets/${ticketId}/messages`,
         method: 'POST',
@@ -177,6 +185,12 @@ export const ticketsApi = createApi({
 
     /** PATCH /tickets/:id — update ticket (state, priority, evidence, scoring) */
     updateTicket: builder.mutation<UpdateTicketResponse, UpdateTicketRequest>({
+      // Validate the server response (and args) at the boundary.
+      // Schema has defaults (input != output): validate the raw body (handled SchemaError on
+      // mismatch), then parse to apply defaults and get the output type.
+      rawResponseSchema: UpdateTicketResponseSchema,
+      transformResponse: (raw: unknown) => UpdateTicketResponseSchema.parse(raw),
+      argSchema: UpdateTicketRequestSchema,
       query: ({ ticketId, ...body }) => ({
         url: `/tickets/${ticketId}`,
         method: 'PATCH',
@@ -203,7 +217,7 @@ export const {
 } = ticketsApi;
 
 // Utility selectors for derived data
-export const selectTicketsApiState = (state: { ticketsApi: any }) => state.ticketsApi;
+export const selectTicketsApiState = (state: RootState) => state.ticketsApi;
 export const selectListTicketsResult = ticketsApi.endpoints.listTickets.select();
 
 // Utility selectors for loading states - use the RTK Query hook-based approach

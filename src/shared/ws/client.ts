@@ -1,58 +1,37 @@
 /**
- * WebSocket Client with Reconnection, Heartbeat, and Sequence Acknowledgment
- * 
- * Singleton client managing WebSocket connection lifecycle.
- * Integrates with Redux via wsMiddleware for single source of truth.
+ * WebSocket client: connection lifecycle, heartbeat, seq acknowledgment, reconnection.
+ *
+ * Protocol (ARCHITECTURE.md §5.6):
+ * - every server frame carries a `seq`; the client acks it with `client.ack { seq }`
+ *   (the server retransmits on gaps);
+ * - `heartbeat {}` flows both ways;
+ * - the server does NOT ack client frames, so client sends are fire-and-forget and
+ *   are never retransmitted (a retransmitted `send_command` would run twice).
+ *
+ * Singleton; integrates with Redux via wsMiddleware (single source of truth).
  */
 
-import type {
-  WSEnvelope,
-  ClientToServerPayload,
-  ClientAckPayload,
-  parseEnvelope,
-  createEnvelope,
-  ServerToClientPayload,
-} from './envelope';
-
-import type {
-  WSActionType,
-  WSConnectPayload,
-  WSConnectedPayload,
-  WSDisconnectPayload,
-  WSReconnectingPayload,
-  WSSendPayload,
-  WSMessagePayload,
-  WSSendFailedPayload,
-  WSHeartbeatPayload,
-  WSAckPayload,
-  WSAckTimeoutPayload,
-  WSErrorPayload,
-} from './events';
-
+import type { UnknownAction } from '@reduxjs/toolkit';
+import type { WSEnvelope, ClientToServerPayload, ServerToClientPayload } from './envelope';
+import { parseEnvelope, createEnvelope, SessionInitPayloadSchema } from './envelope';
 import {
-  wsConnect,
   wsConnected,
-  wsDisconnect,
   wsDisconnected,
   wsReconnecting,
   wsReconnectFailed,
-  wsSend,
+  wsSent,
   wsMessage,
   wsSendFailed,
   wsHeartbeatSent,
   wsHeartbeatReceived,
   wsHeartbeatMissed,
   wsAckSent,
-  wsAckReceived,
-  wsAckTimeout,
   wsError,
   ServerEventType,
   ClientEventType,
 } from './events';
 
-/**
- * Configuration options for WSClient
- */
+/** Configuration options for WSClient */
 export interface WSClientConfig {
   /** WebSocket server URL */
   url: string;
@@ -62,7 +41,7 @@ export interface WSClientConfig {
   protocols?: string[];
   /** Heartbeat interval in milliseconds (default: 30000) */
   heartbeatInterval?: number;
-  /** Max missed heartbeats before reconnect (default: 3) */
+  /** Max missed heartbeats before the connection is dropped (default: 3) */
   maxMissedHeartbeats?: number;
   /** Reconnection base delay in ms (default: 1000) */
   reconnectBaseDelay?: number;
@@ -70,60 +49,54 @@ export interface WSClientConfig {
   reconnectMaxDelay?: number;
   /** Max reconnection attempts (default: 10) */
   maxReconnectAttempts?: number;
-  /** Acknowledgment timeout in ms (default: 5000) */
-  ackTimeout?: number;
-  /** Max acknowledgment retries (default: 3) */
-  maxAckRetries?: number;
 }
 
-/**
- * Default configuration
- */
-const DEFAULT_CONFIG: Required<WSClientConfig> = {
-  url: '',
-  accessToken: undefined,
+type ResolvedConfig = Required<Omit<WSClientConfig, 'accessToken'>> & Pick<WSClientConfig, 'accessToken'>;
+
+const DEFAULT_CONFIG: Omit<ResolvedConfig, 'url'> = {
   protocols: [],
   heartbeatInterval: 30_000,
   maxMissedHeartbeats: 3,
   reconnectBaseDelay: 1_000,
   reconnectMaxDelay: 30_000,
   maxReconnectAttempts: 10,
-  ackTimeout: 5_000,
-  maxAckRetries: 3,
 };
 
-/**
- * Internal state for tracking pending acknowledgments
- */
-interface PendingAck {
-  seq: number;
-  envelope: WSEnvelope<ClientToServerPayload>;
-  retries: number;
-  timeoutId: ReturnType<typeof setTimeout>;
-  resolve: (value: WSEnvelope<ServerToClientPayload>) => void;
-  reject: (reason: Error) => void;
+/** Close code used when heartbeats stop (1006 is reserved and throws in browsers). */
+export const HEARTBEAT_TIMEOUT_CLOSE_CODE = 4000;
+
+/** Events emitted by WSClient and their listener arguments. */
+export interface WSClientEvents {
+  open: [sessionId: string, capabilities: string[]];
+  error: [error: Error];
+  close: [code: number, reason: string, wasClean: boolean];
+  message: [envelope: WSEnvelope<ServerToClientPayload>, rawData: string];
+  reconnecting: [attempt: number, nextRetryMs: number];
+  reconnect_failed: [];
 }
 
-/**
- * Minimal event emitter for internal use
- */
+type Listener<E extends keyof WSClientEvents> = (...args: WSClientEvents[E]) => void;
+
+/** Minimal typed event emitter. */
 class EventEmitter {
-  private listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
+  private listeners: { [E in keyof WSClientEvents]?: Array<Listener<E>> } = {};
 
-  on(event: string, listener: (...args: unknown[]) => void): void {
-    (this.listeners[event] ??= []).push(listener);
+  on<E extends keyof WSClientEvents>(event: E, listener: Listener<E>): void {
+    const list: Array<Listener<E>> = this.listeners[event] ?? [];
+    list.push(listener);
+    this.listeners[event] = list as (typeof this.listeners)[E];
   }
 
-  off(event: string, listener: (...args: unknown[]) => void): void {
-    const arr = this.listeners[event];
-    if (arr) {
-      const idx = arr.indexOf(listener);
-      if (idx >= 0) arr.splice(idx, 1);
-    }
+  off<E extends keyof WSClientEvents>(event: E, listener: Listener<E>): void {
+    const list: Array<Listener<E>> | undefined = this.listeners[event];
+    const idx = list?.indexOf(listener) ?? -1;
+    if (list && idx >= 0) list.splice(idx, 1);
   }
 
-  emit(event: string, ...args: unknown[]): void {
-    this.listeners[event]?.forEach((l) => l(...args));
+  emit<E extends keyof WSClientEvents>(event: E, ...args: WSClientEvents[E]): void {
+    const list: Array<Listener<E>> | undefined = this.listeners[event];
+    // copy: listeners may remove themselves while being called
+    list?.slice().forEach((l) => l(...args));
   }
 
   removeAllListeners(): void {
@@ -131,33 +104,28 @@ class EventEmitter {
   }
 }
 
-/**
- * WSClient - Singleton WebSocket client with reconnection, heartbeat, and seq acknowledgment
- */
+/** WSClient — singleton WebSocket client. */
 export class WSClient extends EventEmitter {
   private static instance: WSClient | null = null;
   private ws: WebSocket | null = null;
-  private config: Required<WSClientConfig>;
+  private config: ResolvedConfig;
   private sessionId: string | null = null;
   private seq = 0;
-  private pendingAcks = new Map<number, PendingAck>();
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private missedHeartbeats = 0;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private isConnecting = false;
   private isIntentionalDisconnect = false;
-  private dispatch: ((action: unknown) => void) | null = null;
-  private getState: (() => { auth: { accessToken?: string } }) | null = null;
+  private dispatch: ((action: UnknownAction) => void) | null = null;
+  private getState: (() => { auth: { accessToken?: string | null } }) | null = null;
 
   private constructor(config: WSClientConfig) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
-  /**
-   * Get singleton instance (create if needed)
-   */
+  /** Get the singleton instance; config is required on first call. */
   static getInstance(config?: WSClientConfig): WSClient {
     if (!WSClient.instance) {
       if (!config) {
@@ -165,127 +133,101 @@ export class WSClient extends EventEmitter {
       }
       WSClient.instance = new WSClient(config);
     } else if (config) {
-      // Update config if provided
       WSClient.instance.config = { ...DEFAULT_CONFIG, ...config };
     }
     return WSClient.instance;
   }
 
-  /**
-   * Reset singleton (for testing)
-   */
+  /** Destroy and forget the singleton (tests, logout). */
   static resetInstance(): void {
-    if (WSClient.instance) {
-      WSClient.instance.destroy();
-      WSClient.instance = null;
-    }
+    WSClient.instance?.destroy();
+    WSClient.instance = null;
   }
 
-  /**
-   * Set Redux store dispatch and getState for middleware integration
-   */
+  /** Wire Redux dispatch/getState (called by wsMiddleware). */
   setStore(
-    dispatch: (action: unknown) => void,
-    getState: () => { auth: { accessToken?: string } }
+    dispatch: (action: UnknownAction) => void,
+    getState: () => { auth: { accessToken?: string | null } }
   ): void {
     this.dispatch = dispatch;
     this.getState = getState;
   }
 
-  /**
-   * Connect to WebSocket server
-   */
+  /** Connect; resolves when the server's session.init arrives. */
   connect(): Promise<{ sessionId: string; capabilities: string[] }> {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      return Promise.resolve({ sessionId: this.sessionId!, capabilities: [] });
+    if (this.ws?.readyState === WebSocket.OPEN && this.sessionId) {
+      return Promise.resolve({ sessionId: this.sessionId, capabilities: [] });
     }
 
-    if (this.isConnecting) {
-      return new Promise((resolve, reject) => {
-        const onOpen = (sessionId: string, capabilities: string[]) => {
-          this.off('open', onOpen);
-          this.off('error', onError);
-          resolve({ sessionId, capabilities });
-        };
-        const onError = (error: Error) => {
-          this.off('open', onOpen);
-          this.off('error', onError);
-          reject(error);
-        };
-        this.on('open', onOpen);
-        this.on('error', onError);
-      });
-    }
+    const settled = new Promise<{ sessionId: string; capabilities: string[] }>((resolve, reject) => {
+      const onOpen: Listener<'open'> = (sessionId, capabilities) => {
+        this.off('open', onOpen);
+        this.off('error', onError);
+        resolve({ sessionId, capabilities });
+      };
+      const onError: Listener<'error'> = (error) => {
+        this.off('open', onOpen);
+        this.off('error', onError);
+        reject(error);
+      };
+      this.on('open', onOpen);
+      this.on('error', onError);
+    });
+
+    if (this.isConnecting) return settled;
 
     this.isConnecting = true;
     this.isIntentionalDisconnect = false;
+    const token = this.getState?.().auth.accessToken ?? this.config.accessToken ?? undefined;
 
-    // Get fresh token from store if available
-    const token = this.getState?.().auth.accessToken ?? this.config.accessToken;
-    const url = this.buildUrl(token);
+    try {
+      const ws = new WebSocket(this.buildUrl(token), this.config.protocols);
+      this.ws = ws;
+      ws.binaryType = 'arraybuffer';
 
-    return new Promise((resolve, reject) => {
-      try {
-        // Use global WebSocket constructor
-        (this.ws = new WebSocket(url, this.config.protocols)), (this.ws.binaryType = 'arraybuffer');
-
-        this.ws.onopen = () => {
-          this.isConnecting = false;
-          this.reconnectAttempt = 0;
-          this.startHeartbeat();
-          // Send authenticate if we have a token
-          if (token) {
-            this.send(ClientEventType.AUTHENTICATE, { token });
-          }
-        };
-
-        this.ws.onclose = (event: CloseEvent) => {
-          this.isConnecting = false;
-          this.stopHeartbeat();
-          this.clearPendingAcks(new Error('Connection closed'));
-          this.emit('close', event.code, event.reason, event.wasClean);
-
-          if (!this.isIntentionalDisconnect && this.reconnectAttempt < this.config.maxReconnectAttempts) {
-            this.scheduleReconnect();
-          } else if (!this.isIntentionalDisconnect) {
-            this.emit('reconnect_failed');
-          }
-        };
-
-        this.ws.onerror = (event: Event) => {
-          const error = new Error('WebSocket error');
-          this.emit('error', error);
-          if (this.isConnecting) {
-            this.isConnecting = false;
-            reject(error);
-          }
-        };
-
-        this.ws.onmessage = (event: MessageEvent) => {
-          this.handleMessage(event.data);
-        };
-
-        // Store resolve/reject for when session.init arrives
-        const onOpen = (sessionId: string, capabilities: string[]) => {
-          this.off('open', onOpen);
-          resolve({ sessionId, capabilities });
-        };
-        const onError = (error: Error) => {
-          this.off('open', onOpen);
-          reject(error);
-        };
-        this.on('open', onOpen);
-        this.on('error', onError);
-      } catch (error) {
+      ws.onopen = () => {
         this.isConnecting = false;
-        reject(error);
-      }
-    });
+        this.reconnectAttempt = 0;
+        this.startHeartbeat();
+        if (token) this.send(ClientEventType.AUTHENTICATE, { token });
+      };
+
+      ws.onclose = (event: CloseEvent) => {
+        this.isConnecting = false;
+        this.stopHeartbeat();
+        // Closed before session.init: settle the pending connect() instead of leaking it.
+        const wasEstablished = this.sessionId !== null;
+        this.sessionId = null;
+        if (!wasEstablished && !this.isIntentionalDisconnect) this.emit('error', new Error(`Connection closed (${event.code})`));
+        this.emit('close', event.code, event.reason, event.wasClean);
+        this.dispatch?.(wsDisconnected({ code: event.code, reason: event.reason, wasClean: event.wasClean }));
+
+        if (this.isIntentionalDisconnect) return;
+        if (this.reconnectAttempt < this.config.maxReconnectAttempts) {
+          this.scheduleReconnect();
+        } else {
+          this.emit('reconnect_failed');
+          this.dispatch?.(wsReconnectFailed({ maxAttempts: this.config.maxReconnectAttempts }));
+        }
+      };
+
+      ws.onerror = () => {
+        this.isConnecting = false;
+        this.emit('error', new Error('WebSocket error'));
+      };
+
+      ws.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
+        this.handleMessage(event.data);
+      };
+    } catch (error) {
+      this.isConnecting = false;
+      this.emit('error', error instanceof Error ? error : new Error(String(error)));
+    }
+
+    return settled;
   }
 
-  /**
-   * Disconnect gracefully
-   */
+  /** Disconnect without reconnecting. */
   disconnect(code = 1000, reason = 'Client disconnect'): void {
     this.isIntentionalDisconnect = true;
     this.stopHeartbeat();
@@ -301,119 +243,58 @@ export class WSClient extends EventEmitter {
   }
 
   /**
-   * Send a message with optional acknowledgment handling
+   * Write one frame. Fire-and-forget: the protocol has no server ack for client
+   * frames. Throws (after dispatching ws/send_failed) if the socket is not open.
    */
-  send<T extends ClientToServerPayload>(
-    type: ClientEventType,
-    payload: T
-  ): Promise<WSEnvelope<ServerToClientPayload> | void> {
+  send<T extends ClientToServerPayload>(type: ClientEventType, payload: T): void {
     if (this.ws?.readyState !== WebSocket.OPEN) {
       const error = new Error('WebSocket not connected');
       this.dispatch?.(wsSendFailed({ type, payload, error: error.message }));
       throw error;
     }
-
-    const seq = ++this.seq;
-    const envelope = createEnvelope(type, payload, this.sessionId || '', seq);
-
-    const message = JSON.stringify(envelope);
-    this.ws.send(message);
-
-    this.dispatch?.(wsSend({ type, payload }));
-
-    // For messages that expect ack (non-heartbeat, non-ack)
-    if (type !== ClientEventType.HEARTBEAT && type !== ClientEventType.CLIENT_ACK) {
-      return new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          this.handleAckTimeout(seq);
-          reject(new Error(`Ack timeout for seq ${seq}`));
-        }, this.config.ackTimeout);
-
-        this.pendingAcks.set(seq, {
-          seq,
-          envelope,
-          retries: 0,
-          timeoutId,
-          resolve: resolve as (value: WSEnvelope<ServerToClientPayload>) => void,
-          reject,
-        });
-      });
-    }
-
-    return Promise.resolve();
+    const envelope = createEnvelope(type, payload, this.sessionId ?? '', ++this.seq);
+    this.ws.send(JSON.stringify(envelope));
+    this.dispatch?.(wsSent({ type, payload }));
   }
 
-  /**
-   * Send acknowledgment for received message
-   */
+  /** Acknowledge a server frame. No-op while disconnected (the server retransmits). */
   ack(seq: number): void {
-    // Dispatch the ack action regardless of connection state
-    // The CLIENT_ACK message is sent via send() when the WS is open
-    // Here we just track the intent and dispatch the Redux action
-    this.dispatch?.(wsAckSent({ seq, acknowledgedSeq: seq }));
+    if (!this.isConnected()) return;
+    this.send(ClientEventType.CLIENT_ACK, { seq });
+    this.dispatch?.(wsAckSent({ seq: this.seq, acknowledgedSeq: seq }));
   }
 
-  /**
-   * Get current connection state
-   */
   get readyState(): number {
     return this.ws?.readyState ?? WebSocket.CLOSED;
   }
 
-  /**
-   * Get current session ID
-   */
   getSessionId(): string | null {
     return this.sessionId;
   }
 
-  /**
-   * Check if connected
-   */
   isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
-  /**
-   * Update access token (for auth refresh)
-   */
+  /** Update the access token (auth refresh) and re-authenticate if connected. */
   updateAccessToken(token: string): void {
     this.config.accessToken = token;
-    if (this.isConnected()) {
-      this.send(ClientEventType.AUTHENTICATE, { token });
-    }
+    if (this.isConnected()) this.send(ClientEventType.AUTHENTICATE, { token });
   }
 
-  /**
-   * Destroy client completely
-   */
   destroy(): void {
     this.disconnect(1001, 'Client destroyed');
     this.removeAllListeners();
   }
 
-  /**
-   * Build WebSocket URL with auth token
-   */
   private buildUrl(token?: string): string {
-    const base = this.config.url ?? 'ws://localhost:8080/ws';
-    const url = new URL(base);
-    if (token) {
-      url.searchParams.set('token', token);
-    }
+    const url = new URL(this.config.url);
+    if (token) url.searchParams.set('token', token);
     return url.toString();
   }
 
-  /**
-   * Handle incoming message
-   */
   private handleMessage(data: string | ArrayBuffer): void {
-    let rawData: string;
-    if (typeof data === 'string') {
-      rawData = data;
-    } else {
-      rawData = new TextDecoder().decode(data);
-    }
+    const rawData = typeof data === 'string' ? data : new TextDecoder().decode(data);
 
     let parsed: unknown;
     try {
@@ -423,117 +304,46 @@ export class WSClient extends EventEmitter {
       return;
     }
 
-    const envelope = parseEnvelope(parsed);
+    const envelope = parseEnvelope<ServerToClientPayload>(parsed);
     if (!envelope) {
       this.dispatch?.(wsError({ message: 'Invalid envelope format', code: 'INVALID_ENVELOPE', recoverable: true }));
       return;
     }
 
-    // Handle server events
     switch (envelope.t) {
       case ServerEventType.SESSION_INIT: {
-        const initPayload = envelope.payload as { sessionId: string; capabilities: string[] };
-        this.sessionId = initPayload.sessionId;
-        this.emit('open', initPayload.sessionId, initPayload.capabilities);
-        this.dispatch?.(wsConnected({ sessionId: initPayload.sessionId, capabilities: initPayload.capabilities }));
+        const init = SessionInitPayloadSchema.safeParse(envelope.payload);
+        if (!init.success) {
+          this.dispatch?.(wsError({ message: 'Invalid session.init payload', code: 'INVALID_SESSION_INIT', recoverable: false }));
+          return;
+        }
+        this.sessionId = init.data.sessionId;
+        this.emit('open', init.data.sessionId, init.data.caps);
+        this.dispatch?.(wsConnected({ sessionId: init.data.sessionId, capabilities: init.data.caps }));
         break;
       }
 
       case ServerEventType.HEARTBEAT: {
         this.missedHeartbeats = 0;
         this.dispatch?.(wsHeartbeatReceived({ timestamp: envelope.ts }));
-        this.ack(envelope.seq);
-        break;
-      }
-
-      case ServerEventType.CLIENT_ACK: {
-        const ackPayload = envelope.payload as { seq: number };
-        this.handleAckReceived(ackPayload.seq);
         break;
       }
 
       default: {
-        // Dispatch to Redux for all other messages
-        this.dispatch?.(wsMessage({ envelope: envelope as WSEnvelope<ServerToClientPayload>, rawData }));
-        this.emit('message', envelope as WSEnvelope<ServerToClientPayload>, rawData);
-        // Auto-ack for server-to-client messages that need it
-        this.ack(envelope.seq);
+        this.dispatch?.(wsMessage({ envelope, rawData }));
+        this.emit('message', envelope, rawData);
       }
     }
+
+    this.ack(envelope.seq);
   }
 
-  /**
-   * Handle received acknowledgment
-   */
-  private handleAckReceived(ackedSeq: number): void {
-    const pending = this.pendingAcks.get(ackedSeq);
-    if (pending) {
-      clearTimeout(pending.timeoutId);
-      this.pendingAcks.delete(ackedSeq);
-      this.dispatch?.(wsAckReceived({ seq: pending.seq, acknowledgedSeq: ackedSeq }));
-      // Note: In a real implementation, we'd match the response envelope here
-      // For now, resolve with a minimal envelope
-      pending.resolve({
-        v: 1,
-        t: 'ack',
-        sid: this.sessionId || '',
-        seq: ackedSeq,
-        ts: Date.now(),
-        payload: { seq: ackedSeq },
-      } as WSEnvelope<ServerToClientPayload>);
-    }
-  }
-
-  /**
-   * Handle acknowledgment timeout with retry
-   */
-  private handleAckTimeout(seq: number): void {
-    const pending = this.pendingAcks.get(seq);
-    if (!pending) return;
-
-    if (pending.retries < this.config.maxAckRetries) {
-      pending.retries++;
-      clearTimeout(pending.timeoutId);
-      pending.timeoutId = setTimeout(() => {
-        this.handleAckTimeout(seq);
-      }, this.config.ackTimeout * (pending.retries + 1));
-
-      // Retry sending
-      this.ws?.send(JSON.stringify(pending.envelope));
-      this.dispatch?.(wsAckTimeout({ seq, retries: pending.retries }));
-    } else {
-      this.pendingAcks.delete(seq);
-      clearTimeout(pending.timeoutId);
-      pending.reject(new Error(`Max ack retries exceeded for seq ${seq}`));
-      this.dispatch?.(wsError({ message: `Max ack retries exceeded for seq ${seq}`, code: 'ACK_MAX_RETRIES', recoverable: true }));
-    }
-  }
-
-  /**
-   * Clear all pending acknowledgments
-   */
-  private clearPendingAcks(error: Error): void {
-    for (const pending of this.pendingAcks.values()) {
-      clearTimeout(pending.timeoutId);
-      pending.reject(error);
-    }
-    this.pendingAcks.clear();
-  }
-
-  /**
-   * Start heartbeat timer
-   */
   private startHeartbeat(): void {
     this.stopHeartbeat();
     this.missedHeartbeats = 0;
-    this.heartbeatTimer = setInterval(() => {
-      this.sendHeartbeat();
-    }, this.config.heartbeatInterval);
+    this.heartbeatTimer = setInterval(() => this.sendHeartbeat(), this.config.heartbeatInterval);
   }
 
-  /**
-   * Stop heartbeat timer
-   */
   private stopHeartbeat(): void {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
@@ -541,11 +351,8 @@ export class WSClient extends EventEmitter {
     }
   }
 
-  /**
-   * Send heartbeat
-   */
   private sendHeartbeat(): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    if (!this.isConnected()) return;
 
     this.send(ClientEventType.HEARTBEAT, {});
     this.dispatch?.(wsHeartbeatSent({ timestamp: Date.now() }));
@@ -553,35 +360,32 @@ export class WSClient extends EventEmitter {
 
     if (this.missedHeartbeats > this.config.maxMissedHeartbeats) {
       this.dispatch?.(wsHeartbeatMissed({ missedCount: this.missedHeartbeats }));
-      this.ws?.close(1006, 'Heartbeat timeout');
+      this.stopHeartbeat();
+      this.ws?.close(HEARTBEAT_TIMEOUT_CLOSE_CODE, 'Heartbeat timeout');
     }
   }
 
-  /**
-   * Schedule reconnection with exponential backoff
-   */
+  /** Schedule reconnection with exponential backoff and jitter. */
   private scheduleReconnect(): void {
     const delay = Math.min(
       this.config.reconnectBaseDelay * Math.pow(2, this.reconnectAttempt),
       this.config.reconnectMaxDelay
     );
-    // Add jitter
-    const jitter = delay * 0.1 * Math.random();
-    const nextRetryMs = Math.floor(delay + jitter);
+    const nextRetryMs = Math.floor(delay + delay * 0.1 * Math.random());
 
     this.reconnectAttempt++;
     this.emit('reconnecting', this.reconnectAttempt, nextRetryMs);
+    this.dispatch?.(
+      wsReconnecting({ attempt: this.reconnectAttempt, maxAttempts: this.config.maxReconnectAttempts, nextRetryMs })
+    );
 
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(() => {
-        // Connection failure handled by onclose
+        // failure is reported via onclose -> next scheduleReconnect / reconnect_failed
       });
     }, nextRetryMs);
   }
 }
 
-/**
- * Type-safe wrapper for parseEnvelope (re-export)
- */
 export { parseEnvelope, createEnvelope } from './envelope';
 export type { WSEnvelope, ClientToServerPayload, ServerToClientPayload } from './envelope';

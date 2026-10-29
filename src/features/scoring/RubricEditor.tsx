@@ -10,8 +10,8 @@
  * Responsive: Full editor >=1280px; simplified view <1024px.
  */
 
-import { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { z } from 'zod';
 import { selectSelectedTicket } from '../tickets/slice';
 
@@ -43,7 +43,7 @@ const RubricDslSchema = z.object({
 
 type RubricDsl = z.infer<typeof RubricDslSchema>;
 
-// ---------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------
 // RubricEditor component — instructor-only
  *
  * Features:
@@ -70,7 +70,6 @@ interface RubricEditorProps {
 export const RubricEditor: React.FC<RubricEditorProps> = ({
   initialRubric,
 }) => {
-  const dispatch = useDispatch();
   const selectedTicket = useSelector(selectSelectedTicket);
 
   // Check instructor role — simplified check
@@ -84,7 +83,7 @@ export const RubricEditor: React.FC<RubricEditorProps> = ({
   const validateRubric = (rubric: RubricDsl): string | null => {
     const result = RubricDslSchema.safeParse(rubric);
     if (!result.success) {
-      const errors = result.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
+      const errors = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
       setEditorError(`Validation error: ${errors}`);
       return errors;
     }
@@ -94,8 +93,8 @@ export const RubricEditor: React.FC<RubricEditorProps> = ({
 
   // Save rubric
   const saveRubric = async () => {
-    if (!selectedTicket) {
-      setEditorError('No ticket selected');
+    if (!selectedTicket || !rubric) {
+      setEditorError('No ticket selected or rubric empty');
       return;
     }
     setIsSaving(true);
@@ -105,7 +104,7 @@ export const RubricEditor: React.FC<RubricEditorProps> = ({
       const error = validateRubric(rubric);
       if (error) return;
       setIsSaving(false);
-    } catch (err) {
+    } catch {
       setEditorError('Failed to save rubric');
       setIsSaving(false);
     }
@@ -143,7 +142,7 @@ export const RubricEditor: React.FC<RubricEditorProps> = ({
     try {
       const parsed = RubricDslSchema.parse(JSON.parse(newContent));
       setRubric(parsed);
-    } catch (err) {
+    } catch {
       // Silently ignore invalid input while typing; validate on blur/save
     }
   };
@@ -168,7 +167,7 @@ export const RubricEditor: React.FC<RubricEditorProps> = ({
         {rubric ? (
           <pre
             className="rubric-editor-content"
-            onChange={(e: React.ChangeEvent<HTMLPreElement>) => handleEditorChange(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLPreElement>) => handleEditorChange(e.currentTarget.textContent ?? "")}
           >
             {JSON.stringify(rubric, null, 2)}
           </pre>

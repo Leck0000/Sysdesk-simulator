@@ -8,20 +8,14 @@
  * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
  */
 
-import { createApi, baseQueryFromFetch } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import type { RootState } from '../../app/store';
+import { apiBaseQuery } from '../../shared/api/baseQuery';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
 // Zod schemas (boundary validation — never pass raw network data downstream)
 // ---------------------------------------------------------------------------
-
-/** Scoring update payload from WebSocket — matches ARCHITECTURE.md §4.5 */
-const ScoringUpdateSchema = z.object({
-  ticketId: z.string().uuid(),
-  score: z.number().int().min(0).max(100),
-  feedback: z.string().optional(),
-  timestamp: z.string().datetime(),
-});
 
 /** Score summary payload */
 const ScoreSummarySchema = z.object({
@@ -30,7 +24,6 @@ const ScoreSummarySchema = z.object({
   communication: z.number().int().min(0).max(100),
 });
 
-type ScoringUpdate = z.infer<typeof ScoringUpdateSchema>;
 type ScoreSummary = z.infer<typeof ScoreSummarySchema>;
 
 // ---------------------------------------------------------------------------
@@ -39,21 +32,7 @@ type ScoreSummary = z.infer<typeof ScoreSummarySchema>;
 
 export const scoringApi = createApi({
   reducerPath: 'scoringApi',
-  baseQuery: baseQueryFromFetch({
-    prepareHeaders: (headers, { getState }) => {
-      const state = getState();
-      // Read auth token from Redux store
-      const authState = state as any;
-      const accessToken =
-        typeof authState?.auth?.accessToken === 'string'
-          ? authState.auth.accessToken
-          : '';
-      if (accessToken) {
-        headers.set('Authorization', `Bearer ${accessToken}`);
-      }
-      return headers;
-    },
-  }),
+  baseQuery: apiBaseQuery,
   tagTypes: ['Scoring'],
   endpoints: (builder) => ({
     /** SUBSCRIBE to scoring_update WebSocket events
@@ -69,6 +48,8 @@ export const scoringApi = createApi({
 
     /** Get score summary for a ticket type */
     getScoreSummary: builder.query<ScoreSummary, string>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: ScoreSummarySchema,
       query: (ticketType) => ({
         url: `/score/${ticketType}`,
         method: 'GET',
@@ -89,7 +70,7 @@ export const {
   useGetScoreSummaryQuery,
 } = scoringApi;
 
-export const selectScoringApiState = (state: { scoringApi: any }) => state.scoringApi;
+export const selectScoringApiState = (state: RootState) => state.scoringApi;
 export const selectScoringApiResults = scoringApi.endpoints.subscribeScoringUpdates.select();
 export const selectIsSubscribingScoring = (state: { scoringApi: { queries: Record<string, { status: string }> } }) => {
   const queries = state.scoringApi?.queries ?? {};

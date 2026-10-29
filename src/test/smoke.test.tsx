@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { App } from '../main.tsx';
+import { App } from '../app/App';
 
 test('app mounts', () => {
   render(<App />);

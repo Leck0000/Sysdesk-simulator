@@ -10,29 +10,27 @@ import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { desktopSlice } from './slice';
+import wsReducer, { initialWSState } from '../../shared/ws/slice';
 import { ADUsersComputers } from './ADUsersComputers';
 
 // Mock window.matchMedia for responsive tests
-global.matchMedia = global.matchMedia || ((params: string) => ({
+globalThis.matchMedia = globalThis.matchMedia || ((params: string) => ({
   matches: false,
   media: params,
   onchange: null,
-  addListener: jest.fn(),
-  removeListener: jest.fn(),
-  addEventListener: jest.fn(),
-  removeEventListener: jest.fn(),
-  dispatchEvent: jest.fn(),
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
 }));
 
 const store = configureStore({
   reducer: {
     desktop: desktopSlice.reducer,
-    // Mock ws state
-    ws: {
-      reducer: () => ({ state: { sessionId: 'test-session' } }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any,
+    ws: wsReducer,
   },
+  preloadedState: { ws: { ...initialWSState, sessionId: 'test-session' } },
 });
 
 describe('ADUsersComputers', () => {
@@ -47,7 +45,7 @@ describe('ADUsersComputers', () => {
         <ADUsersComputers windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('ad-users-computers');
+    const component = screen.getByTestId('ADUsersComputers');
     expect(component).toBeInTheDocument();
   });
 
@@ -57,7 +55,7 @@ describe('ADUsersComputers', () => {
         <ADUsersComputers windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('ad-users-computers');
+    const component = screen.getByTestId('ADUsersComputers');
     expect(component).toHaveStyle('background-color: var(--card)');
     expect(component).toHaveStyle('color: var(--fg)');
   });
@@ -68,8 +66,8 @@ describe('ADUsersComputers', () => {
         <ADUsersComputers windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('ad-users-computers');
-    expect(component).toHaveAttribute('role', 'dialog');
+    const component = screen.getByTestId('ADUsersComputers');
+    expect(component).toHaveAttribute('role', 'region');
   });
 
   test('displays loading state initially', () => {
@@ -86,7 +84,7 @@ describe('ADUsersComputers', () => {
     // Manually set users state
     store.dispatch(
       desktopSlice.actions.openAppWindow({
-        app: 'ad-users-computers',
+        app: 'ADUsersComputers',
         title: 'Active Directory',
         machineId: 'machine-001',
       })
@@ -97,7 +95,7 @@ describe('ADUsersComputers', () => {
         <ADUsersComputers windowId="win-001" />
       </Provider>
     );
-    const container = screen.getByTestId('ad-users-computers');
+    const container = screen.getByTestId('ADUsersComputers');
     expect(container).toBeInTheDocument();
   });
 });

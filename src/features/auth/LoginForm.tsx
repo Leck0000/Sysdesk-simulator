@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { z } from 'zod';
 import { login } from './slice';
-import { selectIsLoggingIn, selectAuthApiState } from './api';
+import { selectIsLoggingIn } from './api';
 import { toast } from 'sonner';
 
 // ---------------------------------------------------------------------------
@@ -36,7 +36,6 @@ export const LoginForm: React.FC = () => {
 
   // Read form state from Redux
   const isLoggingIn = useSelector(selectIsLoggingIn);
-  const authApiState = useSelector(selectAuthApiState);
 
   // Local form state
   const [form, setForm] = useState<LoginFormValues>({

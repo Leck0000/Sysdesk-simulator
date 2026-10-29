@@ -40,7 +40,7 @@ describe('ticketsSlice', () => {
       const state = ticketsReducer(initialState, { type: 'tickets/setQueue', payload: queue });
 
       expect(state.queue.length).toBe(1);
-      expect(state.queue[0].id).toBe('1');
+      expect(state.queue[0]!.id).toBe('1');
       expect(state.status).toBe('succeeded');
     });
   });
@@ -60,7 +60,7 @@ describe('ticketsSlice', () => {
       const state = ticketsReducer(initialState, { type: 'tickets/addTicket', payload: ticket });
 
       expect(state.queue.length).toBe(1);
-      expect(state.queue[0].id).toBe('2');
+      expect(state.queue[0]!.id).toBe('2');
     });
 
     it('does not add duplicate tickets', () => {
@@ -99,7 +99,7 @@ describe('ticketsSlice', () => {
         { type: 'tickets/updateTicketInQueue', payload: { id: '4', priority: 'high' } }
       );
 
-      expect(state2.queue[0].priority).toBe('high');
+      expect(state2.queue[0]!.priority).toBe('high');
     });
   });
 
@@ -247,7 +247,7 @@ describe('ticketsSlice', () => {
         { type: 'tickets/mergeTicketUpdate', payload: { ticketId: '8', status: 'in_progress', timestamp: Date.now().toString() } }
       );
 
-      expect(state2.queue[0].state).toBe('in_progress');
+      expect(state2.queue[0]!.state).toBe('in_progress');
     });
 
     it('does nothing when ticket not in queue', () => {

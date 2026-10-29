@@ -2,22 +2,10 @@ import { z } from 'zod';
 import { describe, it, expect } from 'vitest';
 
 import { authApi } from './api';
-import { configureStore } from '@reduxjs/toolkit';
 
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
-
-function createTestStore() {
-  return configureStore({
-    reducer: {
-      auth: (state = { accessToken: '', user: null, roles: [], status: 'idle' }) => state,
-      [authApi.reducerPath]: authApi.reducer,
-    },
-    middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware().concat(authApi.middleware),
-  });
-}
 
 // ---------------------------------------------------------------------------
 // authApi endpoint existence tests

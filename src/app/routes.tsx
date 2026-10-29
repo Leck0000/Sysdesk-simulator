@@ -1,42 +1,47 @@
-import { Suspense } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { Workspace } from '../features/layout/Workspace';
 
-// Lazy-loaded feature components
-const Home = () => null;
-const Auth = () => null;
-const Tickets = () => null;
-const Desktop = () => null;
-const Communication = () => null;
-const Scoring = () => null;
-const Team = () => null;
-const Certificates = () => null;
-const BulkImport = () => null;
-
-// Lazy-loaded components with code splitting
-const CohortDashboard = () => import('../features/team/CohortDashboard.tsx').then((mod) => mod.CohortDashboard);
-const AssignmentView = () => import('../features/team/AssignmentView.tsx').then((mod) => mod.AssignmentView);
-const ProgressStream = () => import('../features/team/ProgressStream.tsx').then((mod) => mod.ProgressStream);
-
-const LoadingComponent = () => (
-  <div data-testid="loading-spinner">Loading...</div>
+// Secondary screens are code-split; the workspace is the landing page.
+const CohortDashboard = lazy(() =>
+  import('../features/team/CohortDashboard').then((m) => ({ default: m.CohortDashboard }))
 );
+const AssignmentView = lazy(() =>
+  import('../features/team/AssignmentView').then((m) => ({ default: m.AssignmentView }))
+);
+const ProgressStream = lazy(() =>
+  import('../features/team/ProgressStream').then((m) => ({ default: m.ProgressStream }))
+);
+const BulkImport = lazy(() => import('../features/team/BulkImport').then((m) => ({ default: m.BulkImport })));
+const CertificateGallery = lazy(() =>
+  import('../features/certificates/Gallery').then((m) => ({ default: m.CertificateGallery }))
+);
+const ScoreDashboard = lazy(() =>
+  import('../features/scoring/ScoreDashboard').then((m) => ({ default: m.ScoreDashboard }))
+);
+const LoginForm = lazy(() => import('../features/auth/LoginForm').then((m) => ({ default: m.LoginForm })));
 
-export function RoutesComponent() {
+function Loading() {
   return (
-    <Suspense fallback={<LoadingComponent />}>
+    <div data-testid="loading-spinner" className="p-8 text-muted">
+      Loading…
+    </div>
+  );
+}
+
+export function AppRoutes() {
+  return (
+    <Suspense fallback={<Loading />}>
       <Routes>
-        <Route path="/" element={<div data-testid="app-root" />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/tickets" element={<Tickets />} />
-        <Route path="/desktop" element={<Desktop />} />
-        <Route path="/communication" element={<Communication />} />
-        <Route path="/scoring" element={<Scoring />} />
+        <Route path="/" element={<Workspace />} />
+        <Route path="/login" element={<LoginForm />} />
+        <Route path="/scoring" element={<ScoreDashboard />} />
         <Route path="/team" element={<CohortDashboard />} />
         <Route path="/team/assignment/:assignmentId" element={<AssignmentView />} />
         <Route path="/team/progress-stream" element={<ProgressStream />} />
         <Route path="/team/bulk-import" element={<BulkImport />} />
-        <Route path="/certificates" element={<Certificates />} />
-        <Route path="/verify/:type/:id" element={<VerificationPage />} />
+        <Route path="/certificates" element={<CertificateGallery />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
   );

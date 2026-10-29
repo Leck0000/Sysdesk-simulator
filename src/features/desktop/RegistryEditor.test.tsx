@@ -10,29 +10,27 @@ import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { desktopSlice } from './slice';
+import wsReducer, { initialWSState } from '../../shared/ws/slice';
 import { RegistryEditor } from './RegistryEditor';
 
 // Mock window.matchMedia for responsive tests
-global.matchMedia = global.matchMedia || ((params: string) => ({
+globalThis.matchMedia = globalThis.matchMedia || ((params: string) => ({
   matches: false,
   media: params,
   onchange: null,
-  addListener: jest.fn(),
-  removeListener: jest.fn(),
-  addEventListener: jest.fn(),
-  removeEventListener: jest.fn(),
-  dispatchEvent: jest.fn(),
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
 }));
 
 const store = configureStore({
   reducer: {
     desktop: desktopSlice.reducer,
-    // Mock ws state
-    ws: {
-      reducer: () => ({ state: { sessionId: 'test-session' } }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any,
+    ws: wsReducer,
   },
+  preloadedState: { ws: { ...initialWSState, sessionId: 'test-session' } },
 });
 
 describe('RegistryEditor', () => {
@@ -47,7 +45,7 @@ describe('RegistryEditor', () => {
         <RegistryEditor windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('registry-editor');
+    const component = screen.getByTestId('RegistryEditor');
     expect(component).toBeInTheDocument();
   });
 
@@ -57,7 +55,7 @@ describe('RegistryEditor', () => {
         <RegistryEditor windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('registry-editor');
+    const component = screen.getByTestId('RegistryEditor');
     expect(component).toHaveStyle('background-color: var(--card)');
     expect(component).toHaveStyle('color: var(--fg)');
   });
@@ -68,8 +66,8 @@ describe('RegistryEditor', () => {
         <RegistryEditor windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('registry-editor');
-    expect(component).toHaveAttribute('role', 'dialog');
+    const component = screen.getByTestId('RegistryEditor');
+    expect(component).toHaveAttribute('role', 'region');
   });
 
   test('displays loading state initially', () => {
@@ -86,7 +84,7 @@ describe('RegistryEditor', () => {
     // Manually set keys state
     store.dispatch(
       desktopSlice.actions.openAppWindow({
-        app: 'registry-editor',
+        app: 'RegistryEditor',
         title: 'Registry Editor',
         machineId: 'machine-001',
       })
@@ -97,7 +95,7 @@ describe('RegistryEditor', () => {
         <RegistryEditor windowId="win-001" />
       </Provider>
     );
-    const container = screen.getByTestId('registry-editor');
+    const container = screen.getByTestId('RegistryEditor');
     expect(container).toBeInTheDocument();
   });
 });

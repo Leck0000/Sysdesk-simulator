@@ -10,7 +10,7 @@
  */
 
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { Certificate, CertificateListItem } from './api';
+import type { Certificate } from './api';
 
 // ---------------------------------------------------------------------------
 // Initial certificates state

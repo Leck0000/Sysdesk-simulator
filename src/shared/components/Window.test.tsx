@@ -1,258 +1,144 @@
 /**
- * Window tests — base window chrome with titlebar, drag, resize,
- * minimize, maximize, close.
- *
- * Strict TS: no `any`; use `unknown` + zod parsers at boundaries
- * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors
- * Accessibility: WCAG 2.1 AA
+ * DesktopWindowFrame / WindowManager tests — chrome, theming, controls,
+ * drag and resize persisting to the desktop slice.
  */
+import { describe, it, expect } from 'vitest';
+import { render, fireEvent, screen } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import desktopReducer, { openAppWindow, type DesktopWindow } from '../../features/desktop/slice';
+import { DesktopWindowFrame, WindowManager } from '../../features/desktop/WindowManager';
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render } from '@testing-library/react';
-import { Window } from '../../features/desktop/WindowManager';
+const makeStore = () => configureStore({ reducer: { desktop: desktopReducer } });
+type TestStore = ReturnType<typeof makeStore>;
 
-describe('Window component', () => {
-  const window = {
-    id: 'test-window-1',
-    title: 'Test Window',
-    innerWidth: 400,
-    innerHeight: 300,
-    x: 100,
-    y: 50,
-    state: 'normal',
-    resizable: true,
-    draggable: true,
-    minimized: false,
-    maximized: false,
-  };
+const base: DesktopWindow = {
+  id: 'test-window-1',
+  title: 'Test Window',
+  innerWidth: 400,
+  innerHeight: 300,
+  x: 100,
+  y: 50,
+  state: 'normal',
+  resizable: true,
+  draggable: true,
+  minimized: false,
+  maximized: false,
+};
 
-  beforeEach(() => {
-    // No crypto mock needed - window objects are pre-built
+function renderFrame(overrides: Partial<DesktopWindow> = {}, store: TestStore = makeStore()) {
+  const utils = render(
+    <Provider store={store}>
+      <DesktopWindowFrame desktopWindow={{ ...base, ...overrides }} zIndex={1} active>
+        <p>content</p>
+      </DesktopWindowFrame>
+    </Provider>
+  );
+  const frame = () => utils.container.querySelector<HTMLElement>('[data-testid="window-test-window-1"]');
+  return { ...utils, frame, store };
+}
+
+describe('DesktopWindowFrame', () => {
+  it('renders the titlebar with the window title and children', () => {
+    const { container } = renderFrame();
+    expect(container.querySelector('[data-testid="window-titlebar"]')?.textContent).toContain('Test Window');
+    expect(container.querySelector('[data-testid="window-title"]')).toBeInTheDocument();
+    expect(screen.getByText('content')).toBeInTheDocument();
   });
 
-  it('renders titlebar with window title', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const titlebar = container.querySelector('[data-testid="window-titlebar"]');
-    expect(titlebar).toBeInTheDocument();
-    expect(titlebar?.textContent).toContain('Test Window');
+  it('renders minimize, maximize and close controls with accessible names', () => {
+    renderFrame();
+    expect(screen.getByRole('button', { name: 'Minimize window' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Maximize window' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close window' })).toBeInTheDocument();
   });
 
-  it('renders window title in title span', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const title = container.querySelector('[data-testid="window-title"]');
-    expect(title).toBeInTheDocument();
-    expect(title?.textContent).toBe('Test Window');
+  it('themes via CSS variables only', () => {
+    const { container, frame } = renderFrame();
+    const titleStyle = container.querySelector('[data-testid="window-titlebar"]')?.getAttribute('style') ?? '';
+    expect(titleStyle).toContain('var(--accent)');
+    expect(titleStyle).toContain('var(--bg)');
+    const frameStyle = frame()?.getAttribute('style') ?? '';
+    expect(frameStyle).toContain('var(--card)');
+    expect(frameStyle).toContain('var(--fg)');
   });
 
-  it('renders minimize button when window can be minimized', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const minimizeBtn = container.querySelector('[data-testid="window-minimize"]');
-    expect(minimizeBtn).toBeInTheDocument();
-  });
-
-  it('renders maximize button when window can be maximized', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const maximizeBtn = container.querySelector('[data-testid="window-maximize"]');
-    expect(maximizeBtn).toBeInTheDocument();
-  });
-
-  it('renders close button', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const closeBtn = container.querySelector('[data-testid="window-close"]');
-    expect(closeBtn).toBeInTheDocument();
-  });
-
-  it('applies theming via CSS variables', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const titlebar = container.querySelector('[data-testid="window-titlebar"]');
-    expect(titlebar).toBeInTheDocument();
-    const style = titlebar?.getAttribute('style') || '';
-    expect(style).toContain('var(--accent)');
-    expect(style).toContain('var(--bg)');
-  });
-
-  it('applies card styling via CSS variables', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const windowDiv = container.querySelector('[data-testid="window-1"]');
-    expect(windowDiv).toBeInTheDocument();
-    const style = windowDiv?.getAttribute('style') || '';
-    expect(style).toContain('var(--card)');
-    expect(style).toContain('var(--border)');
-    expect(style).toContain('var(--fg)');
-  });
-
-  it('renders title drag handle when window can be dragged', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const dragHandle = container.querySelector('[data-testid="title-drag-handle"]');
-    expect(dragHandle).toBeInTheDocument();
-  });
-
-  it('shows resize handle when window can be resized', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const resizeHandle = container.querySelector('[data-testid="resize-se"]');
-    expect(resizeHandle).toBeInTheDocument();
-  });
-
-  it('hides resize handle when window is minimized', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const resizeHandle = container.querySelector('[data-testid="resize-se"]');
-    expect(resizeHandle).not.toBeInTheDocument();
-  });
-
-  it('hides resize handle when window is maximized', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const resizeHandle = container.querySelector('[data-testid="resize-se"]');
-    expect(resizeHandle).not.toBeInTheDocument();
-  });
-
-  it('renders correct positioning and sizing', () => {
-    const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
-    );
-    const windowDiv = container.querySelector('[data-testid="window-1"]');
-    expect(windowDiv).toBeInTheDocument();
-    const style = windowDiv?.getAttribute('style') || '';
+  it('positions and sizes from the window bounds', () => {
+    const style = renderFrame().frame()?.getAttribute('style') ?? '';
     expect(style).toContain('left: 100px');
     expect(style).toContain('top: 50px');
     expect(style).toContain('width: 400px');
     expect(style).toContain('height: 300px');
   });
 
-  it('applies effective dimensions when maximized', () => {
-    const maximizedWindow = { ...window, maximized: true, innerWidth: 800, innerHeight: 600 };
-    const { container } = render(
-      <Window
-        window={maximizedWindow}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+  it('fills the desktop and hides drag/resize handles when maximized', () => {
+    const { container, frame } = renderFrame({ maximized: true, state: 'maximized' });
+    const style = frame()?.getAttribute('style') ?? '';
+    expect(style).toContain('width: 100%');
+    expect(style).toContain('height: 100%');
+    expect(container.querySelector('[data-testid="resize-se"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="title-drag-handle"]')).not.toBeInTheDocument();
+  });
+
+  it('renders nothing while minimized', () => {
+    expect(renderFrame({ minimized: true, state: 'minimized' }).frame()).toBeNull();
+  });
+
+  it('shows drag and resize handles for a normal window', () => {
+    const { container } = renderFrame();
+    expect(container.querySelector('[data-testid="title-drag-handle"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-testid="resize-se"]')).toBeInTheDocument();
+  });
+});
+
+describe('WindowManager', () => {
+  const openOne = () => {
+    const store = makeStore();
+    store.dispatch(openAppWindow({ app: 'Terminal', title: 'Terminal — m1', machineId: 'm1' }));
+    render(
+      <Provider store={store}>
+        <WindowManager />
+      </Provider>
     );
-    const windowDiv = container.querySelector('[data-testid="window-1"]');
-    expect(windowDiv).toBeInTheDocument();
-    const style = windowDiv?.getAttribute('style') || '';
-    expect(style).toContain('width: 800px');
-    expect(style).toContain('height: 600px');
+    const win = store.getState().desktop.windows[0];
+    if (!win) throw new Error('window not opened');
+    return { store, win };
+  };
+
+  it('dragging the titlebar moves the window and persists bounds to the store', () => {
+    const { store, win } = openOne();
+    const titlebar = screen.getByTestId(`window-${win.id}`).querySelector('[data-testid="window-titlebar"]');
+    if (!titlebar) throw new Error('no titlebar');
+    fireEvent.pointerDown(titlebar, { button: 0, clientX: 200, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(titlebar, { clientX: 260, clientY: 140, pointerId: 1 });
+    fireEvent.pointerUp(titlebar, { clientX: 260, clientY: 140, pointerId: 1 });
+    const moved = store.getState().desktop.windows[0];
+    expect(moved?.x).toBe(win.x + 60);
+    expect(moved?.y).toBe(win.y + 40);
+  });
+
+  it('resizing from the SE handle persists the new size', () => {
+    const { store, win } = openOne();
+    const handle = screen.getByTestId('resize-se');
+    fireEvent.pointerDown(handle, { button: 0, clientX: 500, clientY: 400, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 550, clientY: 430, pointerId: 1 });
+    fireEvent.pointerUp(handle, { clientX: 550, clientY: 430, pointerId: 1 });
+    const resized = store.getState().desktop.windows[0];
+    expect(resized?.innerWidth).toBe(win.innerWidth + 50);
+    expect(resized?.innerHeight).toBe(win.innerHeight + 30);
+  });
+
+  it('minimize moves the window to the taskbar; clicking it restores', () => {
+    const { store } = openOne();
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize window' }));
+    expect(store.getState().desktop.windows[0]?.minimized).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal — m1' }));
+    expect(store.getState().desktop.windows[0]?.minimized).toBe(false);
+  });
+
+  it('close removes the window', () => {
+    const { store } = openOne();
+    fireEvent.click(screen.getByRole('button', { name: 'Close window' }));
+    expect(store.getState().desktop.windows).toHaveLength(0);
   });
 });

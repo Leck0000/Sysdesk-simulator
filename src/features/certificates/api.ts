@@ -8,7 +8,10 @@
  * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
  */
 
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { apiBaseQuery } from '../../shared/api/baseQuery';
+import { isMutationPending, isQueryPending } from '../../shared/api/pending';
+import type { RootState } from '../../app/store';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -102,23 +105,13 @@ export type ValidateCertificateResponse = z.infer<typeof ValidateCertificateResp
 
 export const certificatesApi = createApi({
   reducerPath: 'certificatesApi',
-  baseQuery: fetchBaseQuery({
-    prepareHeaders: (headers, { getState }) => {
-      const state = getState();
-      const accessToken = (state && typeof state === 'object' && 'auth' in state && typeof (state as { auth: { accessToken: string } }).auth.accessToken === 'string')
-        ? (state as { auth: { accessToken: string } }).auth.accessToken
-        : '';
-      if (accessToken) {
-        headers.set('Authorization', `Bearer ${accessToken}`);
-      }
-      return headers;
-    },
-    credentials: 'include',
-  }),
+  baseQuery: apiBaseQuery,
   tagTypes: ['Certificates'],
   endpoints: (builder) => ({
     /** GET /certificates — list issued certificates with optional filters */
     listCertificates: builder.query<CertificateListResponse, { userId?: string; labId?: string; status?: string } | void>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: CertificateListResponseSchema,
       query: (params) => ({
         url: '/certificates',
         method: 'GET',
@@ -130,28 +123,36 @@ export const certificatesApi = createApi({
       }),
       providesTags: (result) =>
         result
-          ? [...result.map(({ id }) => ({ type: 'Certificates', id })), { type: 'Certificates', id: 'LIST' }]
-          : [{ type: 'Certificates', id: 'LIST' }],
+          ? [...result.map(({ id }) => ({ type: 'Certificates' as const, id })), { type: 'Certificates' as const, id: 'LIST' }]
+          : [{ type: 'Certificates' as const, id: 'LIST' }],
     }),
 
     /** GET /certificates/:id — retrieve certificate details */
     getCertificate: builder.query<Certificate, string>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: CertificateSchema,
       query: (id) => `/certificates/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Certificates', id }],
     }),
 
     /** POST /certificates/issue — issue certificate for completed lab/ticket */
     issueCertificate: builder.mutation<IssueCertificateResponse, IssueCertificateRequest>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: IssueCertificateResponseSchema,
+      argSchema: IssueCertificateRequestSchema,
       query: (body) => ({
         url: '/certificates/issue',
         method: 'POST',
         body,
       }),
-      invalidatesTags: [{ type: 'Certificates', id: 'LIST' }],
+      invalidatesTags: [{ type: 'Certificates' as const, id: 'LIST' }],
     }),
 
     /** POST /certificates/validate — validate certificate hash (public endpoint) */
     validateCertificate: builder.mutation<ValidateCertificateResponse, ValidateCertificateRequest>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: ValidateCertificateResponseSchema,
+      argSchema: ValidateCertificateRequestSchema,
       query: (body) => ({
         url: '/certificates/validate',
         method: 'POST',
@@ -178,25 +179,17 @@ export const {
 // Selectors for loading states
 // ---------------------------------------------------------------------------
 
-export const selectIsCertificatesLoading = (state: unknown) => {
-  const running = certificatesApi.util.selectors.getRunningQueriesMap(state)[certificatesApi.endpoints.listCertificates.selector];
-  return !!(running?.pending !== undefined);
-};
+export const selectIsCertificatesLoading = (state: RootState) =>
+  isQueryPending(state.certificatesApi, 'listCertificates');
 
-export const selectIsCertificateLoading = (state: unknown, id: string) => {
-  const running = certificatesApi.util.selectors.getRunningQueriesMap(state)[certificatesApi.endpoints.getCertificate.selector(id)];
-  return !!(running?.pending !== undefined);
-};
+export const selectIsCertificateLoading = (state: RootState, id: string) =>
+  isQueryPending(state.certificatesApi, 'getCertificate', (args) => args === id);
 
-export const selectIsIssuingCertificate = (state: unknown) => {
-  const running = certificatesApi.util.selectors.getRunningMutationsMap(state)[certificatesApi.endpoints.issueCertificate.selector];
-  return !!(running?.pending !== undefined);
-};
+export const selectIsIssuingCertificate = (state: RootState) =>
+  isMutationPending(state.certificatesApi, 'issueCertificate');
 
-export const selectIsValidatingCertificate = (state: unknown) => {
-  const running = certificatesApi.util.selectors.getRunningMutationsMap(state)[certificatesApi.endpoints.validateCertificate.selector];
-  return !!(running?.pending !== undefined);
-};
+export const selectIsValidatingCertificate = (state: RootState) =>
+  isMutationPending(state.certificatesApi, 'validateCertificate');
 
 // ---------------------------------------------------------------------------
 // NOTE: RTK Query loading state for queries/mutations is accessed via the

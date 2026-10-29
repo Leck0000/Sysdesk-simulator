@@ -10,7 +10,6 @@
  */
 
 import { createSlice } from '@reduxjs/toolkit';
-import { z } from 'zod';
 import type { RootState, AppDispatch } from '../../app/store';
 import { authApi } from './api';
 
@@ -91,5 +90,10 @@ export const refresh = () => async (dispatch: AppDispatch) => {
 
 // Expose the generated action creators for use in components
 export const { logout, setUser, resetStatus } = authSlice.actions;
+
+export const selectAuthUser = (state: RootState) => state.auth.user;
+export const selectAuthUserId = (state: RootState) => state.auth.user?.id ?? null;
+
+export const selectUserRole = (state: RootState) => state.auth.user?.role ?? null;
 
 export default authSlice.reducer;

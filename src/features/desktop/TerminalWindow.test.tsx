@@ -1,124 +1,112 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { desktopSlice } from './slice';
+import { configureStore, type Middleware } from '@reduxjs/toolkit';
+import desktopReducer, { openAppWindow, appendTerminalOutput } from './slice';
+import wsReducer, { initialWSState } from '../../shared/ws/slice';
+import { WSActionType, ClientEventType } from '../../shared/ws/events';
 import { TerminalWindow } from './TerminalWindow';
 
-// Mock the ws module that TerminalWindow source imports (same relative path pattern)
-vi.mock('../../shared/ws', () => ({
-  wsSend: vi.fn(),
-  createSendCommand: vi.fn().mockReturnValue({ machineId: 'test-machine', command: 'test' }),
-  ClientEventType: {
-    SEND_COMMAND: 'send_command',
-    COMMAND_OUTPUT: 'command_output',
-    AUTHENTICATE: 'authenticate',
-    REQUEST_MACHINE_STATE: 'request_machine_state',
-    ADD_TICKET_MESSAGE: 'add_ticket_message',
-    CLAIM_TICKET: 'claim_ticket',
+// xterm needs a real canvas; replace it with a recorder.
+const xterm = vi.hoisted(() => ({
+  instances: [] as Array<{ out: string[]; type: (data: string) => void }>,
+}));
+vi.mock('@xterm/xterm', () => ({
+  Terminal: class {
+    out: string[] = [];
+    private handlers: Array<(d: string) => void> = [];
+    constructor() {
+      xterm.instances.push({ out: this.out, type: (d) => this.handlers.forEach((h) => h(d)) });
+    }
+    loadAddon() {}
+    open() {}
+    write(d: string) {
+      this.out.push(d);
+    }
+    writeln(d: string) {
+      this.out.push(d + '\n');
+    }
+    clear() {}
+    focus() {}
+    dispose() {}
+    onData(h: (d: string) => void) {
+      this.handlers.push(h);
+      return { dispose() {} };
+    }
   },
-  isClientEventType: vi.fn().mockReturnValue(true),
 }));
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }));
+vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }));
 
-// Mock xterm and addons
-vi.mock('xterm', () => {
-  const Terminal = vi.fn().mockImplementation(() => ({
-    open: vi.fn(),
-    write: vi.fn(),
-    destroy: vi.fn(),
-    attach: vi.fn(),
-    registerAddon: vi.fn(),
-    isDisposed: false,
-  }));
-  const FitAddon = vi.fn().mockImplementation(() => ({
-    resize: vi.fn(),
-  }));
-  const WebLinksAddon = vi.fn().mockImplementation(() => ({
-    handleDOM: vi.fn(),
-  }));
-  return { Terminal, FitAddon, WebLinksAddon };
-});
+function setup(connected: boolean) {
+  const actions: string[] = [];
+  const payloads: unknown[] = [];
+  const recorder: Middleware = () => (next) => (action) => {
+    const a = action as { type: string; payload?: unknown };
+    actions.push(a.type);
+    payloads.push(a.payload);
+    return next(action);
+  };
+  const store = configureStore({
+    reducer: { desktop: desktopReducer, ws: wsReducer },
+    preloadedState: { ws: { ...initialWSState, connected, sessionId: connected ? 's1' : null } },
+    middleware: (gdm) => gdm().concat(recorder),
+  });
+  store.dispatch(openAppWindow({ app: 'Terminal', title: 'Terminal', machineId: 'm1' }));
+  const win = store.getState().desktop.windows[0];
+  if (!win) throw new Error('no window');
+  render(
+    <Provider store={store}>
+      <TerminalWindow windowId={win.id} />
+    </Provider>
+  );
+  const term = xterm.instances.at(-1);
+  if (!term) throw new Error('xterm not created');
+  return { store, term, actions, payloads };
+}
 
-vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: vi.fn(),
-}));
-
-vi.mock('@xterm/addon-web-links', () => ({
-  WebLinksAddon: vi.fn(),
-}));
-
-const makeStore = () => configureStore({
-  reducer: {
-    desktop: desktopSlice.reducer,
-  },
-});
-
-describe('TerminalWindow Component', () => {
+describe('TerminalWindow', () => {
   beforeEach(() => {
-    const store = makeStore();
-    store.dispatch(desktopSlice.actions.addWindow({
-      title: 'Test Terminal Window',
-      innerWidth: 800,
-      innerHeight: 600,
-      x: 0,
-      y: 0,
-      state: 'normal',
-      resizable: true,
-      draggable: true,
-    }));
+    xterm.instances.length = 0;
   });
 
-  it('renders a terminal window with chrome', () => {
-    const { container } = render(
-      <Provider store={makeStore()}>
-        <TerminalWindow windowId="test-window-1" />
-      </Provider>
-    );
-    const windowDiv = container.querySelector('[data-testid="terminal-window"]');
-    expect(windowDiv).toBeInTheDocument();
-    expect(windowDiv).toHaveTextContent('test-window-1');
+  it('renders a terminal region labelled with the machine and themed by CSS variables', () => {
+    setup(false);
+    const region = screen.getByRole('region', { name: 'Terminal for m1' });
+    expect(region).toBeInTheDocument();
+    const wrapper = screen.getByTestId('terminal-window');
+    expect(wrapper.style.backgroundColor).toBe('var(--bg)');
+    expect(wrapper.style.color).toBe('var(--fg)');
   });
 
-  it('renders the embedded Terminal component', () => {
-    const { container } = render(
-      <Provider store={makeStore()}>
-        <TerminalWindow windowId="test-window-1" />
-      </Provider>
-    );
-    const terminalDiv = container.querySelector('[data-testid="terminal"]');
-    expect(terminalDiv).toBeInTheDocument();
+  it('prints a prompt and an offline notice when not connected; does not send', () => {
+    const { term, actions } = setup(false);
+    expect(term.out.join('')).toContain('Not connected');
+    expect(term.out.join('')).toContain('m1> ');
+    act(() => term.type('dir\r'));
+    expect(term.out.join('')).toContain('(offline) command not sent');
+    expect(actions).not.toContain(WSActionType.SEND);
   });
 
-  it('applies CSS variable theming to window', () => {
-    const { container } = render(
-      <Provider store={makeStore()}>
-        <TerminalWindow windowId="test-window-1" />
-      </Provider>
-    );
-    const windowDiv = container.querySelector('[data-testid="terminal-window"]') as HTMLElement;
-    expect(windowDiv).toBeInTheDocument();
-    expect(windowDiv.style.backgroundColor).toBe('var(--card)');
-    expect(windowDiv.style.color).toBe('var(--fg)');
-    expect(windowDiv.style.border).toBe('1px solid var(--border)');
+  it('sends the typed line as send_command on Enter when connected', () => {
+    const { term, actions, payloads } = setup(true);
+    act(() => term.type('ipconfiq\u007fg\r'));
+    const i = actions.indexOf(WSActionType.SEND);
+    expect(i).toBeGreaterThan(-1);
+    expect(payloads[i]).toEqual({
+      type: ClientEventType.SEND_COMMAND,
+      payload: { machineId: 'm1', command: 'ipconfig' },
+    });
   });
 
-  it('has accessible role attribute on window', () => {
-    const { container } = render(
-      <Provider store={makeStore()}>
-        <TerminalWindow windowId="test-window-1" />
-      </Provider>
-    );
-    const windowDiv = container.querySelector('[data-testid="terminal-window"]') as HTMLElement;
-    expect(windowDiv).toHaveAttribute('role', 'dialog');
-  });
-
-  it('terminal has accessible role attribute', () => {
-    const { container } = render(
-      <Provider store={makeStore()}>
-        <TerminalWindow windowId="test-window-1" />
-      </Provider>
-    );
-    const terminalDiv = container.querySelector('[data-testid="terminal"]') as HTMLElement;
-    expect(terminalDiv).toHaveAttribute('role', 'dialog');
-    expect(terminalDiv).toHaveAttribute('aria-modal', 'true');
+  it('writes server output for its machine into the terminal', () => {
+    const { store, term } = setup(true);
+    act(() => {
+      store.dispatch(appendTerminalOutput({ machineId: 'm1', output: 'IPv4 Address: 10.0.0.5' }));
+      store.dispatch(appendTerminalOutput({ machineId: 'other', output: 'not mine' }));
+    });
+    const text = term.out.join('');
+    expect(text).toContain('IPv4 Address: 10.0.0.5');
+    expect(text).not.toContain('not mine');
   });
 });

@@ -31,6 +31,7 @@ export const WSActionType = {
   
   // Message handling
   SEND: 'ws/send',
+  SENT: 'ws/sent',
   MESSAGE: 'ws/message',
   SEND_FAILED: 'ws/send_failed',
   
@@ -41,8 +42,6 @@ export const WSActionType = {
   
   // Sequence acknowledgment
   ACK_SENT: 'ws/ack_sent',
-  ACK_RECEIVED: 'ws/ack_received',
-  ACK_TIMEOUT: 'ws/ack_timeout',
   
   // Errors
   ERROR: 'ws/error',
@@ -101,11 +100,6 @@ export interface WSAckPayload {
   acknowledgedSeq: number;
 }
 
-export interface WSAckTimeoutPayload {
-  seq: number;
-  retries: number;
-}
-
 export interface WSErrorPayload {
   message: string;
   code?: string;
@@ -146,6 +140,11 @@ export function wsSend(payload: WSSendPayload) {
   return { type: WSActionType.SEND, payload } as const;
 }
 
+/** Notification: the client wrote a message to the socket (not a command). */
+export function wsSent(payload: WSSendPayload) {
+  return { type: WSActionType.SENT, payload } as const;
+}
+
 export function wsMessage<T>(payload: WSMessagePayload<T>) {
   return { type: WSActionType.MESSAGE, payload } as const;
 }
@@ -170,14 +169,6 @@ export function wsHeartbeatMissed(payload: { missedCount: number }) {
 // Sequence acknowledgment
 export function wsAckSent(payload: WSAckPayload) {
   return { type: WSActionType.ACK_SENT, payload } as const;
-}
-
-export function wsAckReceived(payload: WSAckPayload) {
-  return { type: WSActionType.ACK_RECEIVED, payload } as const;
-}
-
-export function wsAckTimeout(payload: WSAckTimeoutPayload) {
-  return { type: WSActionType.ACK_TIMEOUT, payload } as const;
 }
 
 // Errors
@@ -240,8 +231,10 @@ export function isWSMessageAction<T>(
   if (!isWSAction(action) || action.type !== WSActionType.MESSAGE) {
     return false;
   }
-  if (eventType && 'envelope' in action.payload) {
-    return (action.payload as { envelope: WSEnvelope }).envelope.t === eventType;
+  const { payload } = action;
+  if (eventType && typeof payload === 'object' && payload !== null && 'envelope' in payload) {
+    const { envelope } = payload;
+    return typeof envelope === 'object' && envelope !== null && 't' in envelope && envelope.t === eventType;
   }
   return true;
 }

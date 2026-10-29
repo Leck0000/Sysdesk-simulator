@@ -10,23 +10,19 @@
  * Responsive: >=1280px desktop-first; sidebar collapses to drawer <1024px.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useListCertificatesQuery } from '../../features/certificates/api';
 import { z } from 'zod';
-import {
-  setGalleryUserFilter,
-  setGalleryLabFilter,
-  setGalleryFilterStatus,
-  clearGalleryFilters,
-} from '../../features/certificates/slice';
-import { selectAuthUserId } from '../../features/auth/api';
+import type { RootState } from '../../app/store';
+import { setGalleryUserFilter, clearGalleryFilters } from '../../features/certificates/slice';
+import { selectAuthUserId } from '../../features/auth/slice';
 
 // ---------------------------------------------------------------------------
 // Zod schema for gallery item validation (boundary — never pass raw data downstream)
 // ---------------------------------------------------------------------------
 
-const GalleryItemSchema = z.object({
+export const GalleryItemSchema = z.object({
   id: z.string().uuid(),
   userId: z.string().uuid(),
   labId: z.string().uuid(),
@@ -67,11 +63,11 @@ const CertificateCard: React.FC<{ item: GalleryItem }> = ({ item }) => {
           {item.id.substring(0, 3).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium text-var(--fg) line-clamp-1"
+          <h3 className="text-sm font-medium text-fg line-clamp-1"
             style={{ overflow: 'hidden' }}>
             {item.earnedCriteria}
           </h3>
-          <p className="text-xs text-var(--muted) line-clamp-1"
+          <p className="text-xs text-muted line-clamp-1"
             style={{ overflow: 'hidden' }}>
             Lab: {item.labId.substring(0, 8)}… • Issued: {issuedAt.toLocaleDateString()}
           </p>
@@ -80,7 +76,7 @@ const CertificateCard: React.FC<{ item: GalleryItem }> = ({ item }) => {
       <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
         <a
           href={`/verify/${item.earnedCriteria}/${item.id}`}
-          className="text-var(--accent) underline group-hover:underline-offset-4"
+          className="text-accent underline group-hover:underline-offset-4"
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Verify certificate ${item.id}`}>
@@ -88,7 +84,7 @@ const CertificateCard: React.FC<{ item: GalleryItem }> = ({ item }) => {
         </a>
       </div>
       {isExpired && (
-        <p className="text-var(--muted) text-xs mt-1">
+        <p className="text-muted text-xs mt-1">
           <span role="status">Certificate expired</span>
         </p>
       )}
@@ -104,17 +100,17 @@ export const CertificateGallery: React.FC = () => {
   const dispatch = useDispatch();
 
   // Get authenticated user ID from auth slice
-  const authUserId = useSelector((state: any) => selectAuthUserId(state));
+  const authUserId = useSelector(selectAuthUserId);
 
   // Get gallery filters from certificates slice state
   const galleryUserFilter = useSelector(
-    (state: any) => state.certificates.galleryUserId
+    (state: RootState) => state.certificates.galleryUserId
   );
   const galleryLabFilter = useSelector(
-    (state: any) => state.certificates.galleryLabId
+    (state: RootState) => state.certificates.galleryLabId
   );
   const galleryFilterStatus = useSelector(
-    (state: any) => state.certificates.galleryFilterStatus
+    (state: RootState) => state.certificates.galleryFilterStatus
   );
 
   // Determine if we should use lazy or regular query
@@ -123,13 +119,10 @@ export const CertificateGallery: React.FC = () => {
     data,
     isLoading,
     isError,
-    error,
   } = useListCertificatesQuery(
     authUserId ? { userId: authUserId } : undefined,
-    {
-      // enabled only fetches when there's a userId or when explicitly needed
-      enabled: authUserId !== undefined,
-    }
+    // Only fetch once we know who the user is.
+    { skip: !authUserId }
   );
 
   // Apply additional filters from the slice state
@@ -146,7 +139,7 @@ export const CertificateGallery: React.FC = () => {
   const items: GalleryItem[] = data
     ? data
         .filter(
-          (item: any) =>
+          (item) =>
             (!galleryUserFilter || item.userId === galleryUserFilter) &&
             (galleryFilterStatus === 'all' ||
               // Simple status filtering based on expiry
@@ -154,16 +147,16 @@ export const CertificateGallery: React.FC = () => {
                 !item.signedPayload.expiresAt) ||
               (galleryFilterStatus === 'expired' &&
                 item.signedPayload.expiresAt) ||
-              (galleryFilterStatus === 'revoked', false))
+              galleryFilterStatus === 'revoked')
         )
         .filter(
-          (item: any) =>
+          (item) =>
             !galleryLabFilter || item.labId === galleryLabFilter
         )
     : [];
 
   const errorMsg = useSelector(
-    (state: any) => state.certificates.error
+    (state: RootState) => state.certificates.error
   );
 
   return (
@@ -172,13 +165,13 @@ export const CertificateGallery: React.FC = () => {
       aria-label="Certificate gallery"
     >
       <header className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold text-var(--fg)">
+        <h2 className="text-2xl font-bold text-fg">
           Certificate Gallery
         </h2>
         {authUserId && (
           <button
             onClick={() => dispatch(clearGalleryFilters())}
-            className="text-var(--muted) hover:text-var(--accent) transition-colors"
+            className="text-muted hover:text-accent transition-colors"
             aria-label="Clear all filters"
           >
             Clear filters
@@ -190,12 +183,12 @@ export const CertificateGallery: React.FC = () => {
         <div className="alert" style={{ color: 'var(--accent)' }}>
           Loading certificates…
         </div>
-      ) : errorMsg ? (
+      ) : errorMsg || isError ? (
         <div className="alert alert-error" style={{ color: 'var(--fg)' }}>
-          {errorMsg}
+          {errorMsg ?? 'Could not load certificates.'}
         </div>
       ) : items.length === 0 ? (
-        <p className="text-var(--muted) text-center">
+        <p className="text-muted text-center">
           No certificates found.
         </p>
       ) : (

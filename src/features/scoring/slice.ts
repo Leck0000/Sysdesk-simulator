@@ -11,13 +11,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { z } from 'zod';
 import type { RootState, AppDispatch } from '../../app/store';
-import { scoringApi } from './api';
 
 // ---------------------------------------------------------------------------
 // Zod schemas for scoring payload boundaries
 // ---------------------------------------------------------------------------
 
-const ScoringUpdatePayloadSchema = z.object({
+export const ScoringUpdatePayloadSchema = z.object({
   ticketId: z.string().uuid(),
   score: z.number().int().min(0).max(100),
   feedback: z.string().optional(),
@@ -80,10 +79,13 @@ export const scoresSlice = createSlice({
       const updates = action.payload;
       // Update each criterion score
       Object.keys(updates).forEach((criterionId) => {
-        const score = updates[criterionId];
+        const score = updates[criterionId]!; // key exists because we're iterating over Object.keys
         // Find or create the criterion score entry
-        if (score !== undefined) {
-          // Map criterion IDs to names based on known categories
+        if (state.criterionScores[criterionId]) {
+          // Update existing
+          state.criterionScores[criterionId].score = score;
+        } else {
+          // Create new
           const criterionName = criterionId; // fallback name
           state.criterionScores[criterionId] = {
             id: criterionId,
@@ -91,8 +93,6 @@ export const scoresSlice = createSlice({
             score,
             maxScore: 100,
           };
-        } else {
-          state.criterionScores[criterionId].score = score;
         }
       });
 
@@ -111,7 +111,7 @@ export const scoresSlice = createSlice({
 
     /** Merge a scoring_update WebSocket event into the state */
     mergeScoringUpdate: (state, action: PayloadAction<ScoringUpdatePayload>) => {
-      const { ticketId, score, feedback, timestamp } = action.payload;
+      const { score, feedback, timestamp } = action.payload;
 
       // Update the overall scores
       state.technical = score;
@@ -153,7 +153,7 @@ export const scoresSlice = createSlice({
 // ---------------------------------------------------------------------------
 
 /** Subscribe to WebSocket scoring updates — called on app init */
-export const subscribeToScoringUpdates = () => async (dispatch: AppDispatch) => {
+export const subscribeToScoringUpdates = () => async (_dispatch: AppDispatch) => {
   // The wsMiddleware handles WS messages and dispatches ws/message actions
   // We listen for scoring_update events and merge them into the scores state
 };

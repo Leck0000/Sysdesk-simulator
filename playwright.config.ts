@@ -13,6 +13,13 @@ export default defineConfig({
     ...devices['Desktop Chrome'],
   },
 
+  webServer: {
+    command: 'pnpm run preview',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+  },
+
   projects: [
     {
       name: 'Chromium',

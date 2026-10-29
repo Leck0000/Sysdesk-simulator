@@ -1,32 +1,31 @@
-import { describe, it, expect } from 'vitest';
+import authReducer from '../auth/slice';
+import certificatesReducer from './slice';
+import { describe, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { VerificationPage } from './VerificationPage';
 
 // Mock window.matchMedia for responsive tests
-global.matchMedia = global.matchMedia || ((params: string) => ({
+globalThis.matchMedia = globalThis.matchMedia || ((params: string) => ({
   matches: false,
   media: params,
   onchange: null,
-  addListener: jest.fn(),
-  removeListener: jest.fn(),
-  addEventListener: jest.fn(),
-  removeEventListener: jest.fn(),
-  dispatchEvent: jest.fn(),
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
 }));
 
 const store = configureStore({
-  reducer: {
-    auth: (state = { accessToken: '', user: null, roles: [], status: 'idle' }) => state,
-    certificates: (state = { galleryUserId: null, galleryLabId: null, galleryFilterStatus: 'all', selectedCertificate: null, uiStatus: 'idle', error: null }) => state,
-  } as any,
+  reducer: { auth: authReducer, certificates: certificatesReducer },
 });
 
 describe('VerificationPage', () => {
   beforeEach(() => {
     // Reset state before each test
-    store.dispatch(({ type }) => {
+    store.dispatch(() => {
       // No-op reset
     });
   });
@@ -55,7 +54,7 @@ describe('VerificationPage', () => {
       render(
         <Provider store={store}>
           <VerificationPage
-            verificationResult={{ valid: true, payload: { ticket_type: 'bug', ticket_id: 'tb123', score: 85, criteria_met: { c1: 20 }, rubric_hash: 'abc123', issued_at: 1730102400000 }, signature: 'b64...' }}
+            verificationResult={{ valid: true, payload: { ticket_type: 'bug', ticket_id: 'tb123', score: 85, criteria_met: { c1: 20 }, issued_at: 1730102400000 }, signature: 'b64...' }}
           />
         </Provider>
       );

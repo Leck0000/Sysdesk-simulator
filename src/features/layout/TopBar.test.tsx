@@ -1,35 +1,42 @@
 /**
  * TopBar component tests
  */
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
 import { TopBar } from './TopBar';
 
-describe('TopBar', () => {
-  beforeEach(() => {
-    // Set up default Redux store state
-    Object.assign(store.getState(), {
-      auth: {
+const makeStore = () =>
+  configureStore({
+    reducer: {
+      auth: () => ({
         user: { id: '1', role: 'technician' as const, name: 'Test User' },
         roles: ['technician'],
-      },
-    });
+      }),
+    },
   });
 
+const renderTopBar = () =>
+  render(
+    <Provider store={makeStore()}>
+      <TopBar />
+    </Provider>
+  );
+
+describe('TopBar', () => {
   it('renders the TopBar component', () => {
-    render(<TopBar />);
-    const title = screen.getByText('Ticket Queue');
-    expect(title).toBeInTheDocument();
+    renderTopBar();
+    expect(screen.getByText('Ticket Queue')).toBeInTheDocument();
   });
 
   it('renders user name when user is authenticated', () => {
-    render(<TopBar />);
-    const userName = screen.getByText('Test User');
-    expect(userName).toBeInTheDocument();
+    renderTopBar();
+    expect(screen.getByText('Test User')).toBeInTheDocument();
   });
 
   it('renders theme toggle button', () => {
-    render(<TopBar />);
-    const themeBtn = screen.getByRole('button', { name: /switch to light theme/i });
-    expect(themeBtn).toBeInTheDocument();
+    renderTopBar();
+    expect(screen.getByRole('button', { name: /switch to light theme/i })).toBeInTheDocument();
   });
 });
