@@ -10,17 +10,28 @@
  */
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { sonner } from 'sonner';
+import { toast } from 'sonner';
+import { logout } from '../auth/slice';
+
+/** Narrow view of the auth slice that TopBar reads (tolerates an empty slice). */
+interface AuthView {
+  auth?: {
+    user?: { name: string } | null;
+    roles?: string[];
+  };
+}
 
 export function TopBar() {
   const dispatch = useDispatch();
   // Read user/roles from auth slice; handle empty slice gracefully
-  const user = useSelector((state: any) => state.auth?.user ?? null);
-  const roles = useSelector((state: any) => state.auth?.roles ?? []);
+  const user = useSelector((state: AuthView) => state.auth?.user ?? null);
+  const roles = useSelector((state: AuthView) => state.auth?.roles ?? []);
 
   const [theme, setThemeValue] = React.useState<'light' | 'dark'>('dark');
 
   useEffect(() => {
+    // matchMedia is absent in some environments (jsdom, older embeds)
+    if (typeof window.matchMedia !== 'function') return;
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setThemeValue(prefersDark ? 'dark' : 'light');
   }, []);
@@ -28,9 +39,7 @@ export function TopBar() {
   const toggleThemeHandler = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setThemeValue(newTheme);
-    sonner.info(`Theme switched to ${newTheme}`, {
-      action: null,
-    });
+    toast.info(`Theme switched to ${newTheme}`);
   };
 
   return (

@@ -14,7 +14,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { z } from 'zod';
 import type { RootState } from '../../app/store';
-import { desktopSlice } from './slice';
+import {
+  addWindow,
+  closeWindow,
+  maximizeWindow,
+  minimizeWindow,
+  setWindowBounds,
+  setZOrder,
+  toggleWindowState,
+  updateWindow,
+} from './slice';
 import type { Window } from './slice';
 
 // ---------------------------------------------------------------------------
@@ -64,23 +73,6 @@ const WindowManager: React.FC = () => {
   const { windows, zOrder, activeWindowId } = useSelector(
     (state: RootState) => state.desktop
   );
-
-  // Drag state
-  const [drag, setDrag] = useState<DragState>({
-    isDragging: false,
-    startX: 0,
-    startY: 0,
-    startLeft: 0,
-    startTop: 0,
-  });
-  const [resize, setResize] = useState<ResizeState>({
-    isResizing: false,
-    direction: 'se' as const,
-    startX: 0,
-    startY: 0,
-    startWidth: 0,
-    startHeight: 0,
-  });
 
   // Keyboard accessibility: focus management
   useEffect(() => {
@@ -147,6 +139,8 @@ const WindowManager: React.FC = () => {
           key={window.id}
           window={window}
           active={window.id === activeWindowId}
+          activeWindowId={activeWindowId}
+          zOrder={zOrder}
           onMinimize={() => dispatch(minimizeWindow(window.id))}
           onMaximize={() => dispatch(maximizeWindow(window.id))}
           onClose={() => dispatch(closeWindow(window.id))}
@@ -156,8 +150,8 @@ const WindowManager: React.FC = () => {
           onDrag={(windowId: string, deltaX: number, deltaY: number) =>
             dispatch(
               updateWindow({
-                window: { id: windowId, x: deltaX, y: deltaY } as unknown as Window,
-                windowId,
+                window: { x: deltaX, y: deltaY },
+                id: windowId,
               })
             )
           }
@@ -207,6 +201,8 @@ const WindowManager: React.FC = () => {
 interface WindowProps {
   window: Window;
   active: boolean;
+  activeWindowId: string | undefined;
+  zOrder: { windowId: string; zIndex: number }[];
   onMinimize: (windowId: string) => void;
   onMaximize: (windowId: string) => void;
   onClose: (windowId: string) => void;
@@ -225,12 +221,15 @@ interface WindowProps {
 const Window: React.FC<WindowProps> = ({
   window,
   active,
+  activeWindowId,
+  zOrder,
   onMinimize,
   onMaximize,
   onClose,
   onResize,
   onDrag,
 }) => {
+  const dispatch = useDispatch();
   const [isMinimized, setIsMinimized] = useState(window.minimized);
   const [isMaximized, setIsMaximized] = useState(window.maximized);
   const [position, setPosition] = useState<WindowPosition>({
@@ -240,12 +239,30 @@ const Window: React.FC<WindowProps> = ({
     height: window.innerHeight,
   });
 
+  // Drag state (per-window)
+  const [drag, setDrag] = useState<DragState>({
+    isDragging: false,
+    startX: 0,
+    startY: 0,
+    startLeft: 0,
+    startTop: 0,
+  });
+  // Resize state (per-window)
+  const [resize, setResize] = useState<ResizeState>({
+    isResizing: false,
+    direction: 'se' as const,
+    startX: 0,
+    startY: 0,
+    startWidth: 0,
+    startHeight: 0,
+  });
+
   // Bring window to front on mount if it's the active one
   useEffect(() => {
     if (active && activeWindowId && window.id === activeWindowId) {
       dispatch(setZOrder({ windowId: window.id, zIndex: 1000 }));
     }
-  }, [active, window.id, activeWindowId, dispatch]);
+  }, [active, window.id, activeWindowId]);
 
   // Update state when window changes in store
   useEffect(() => {
@@ -277,6 +294,10 @@ const Window: React.FC<WindowProps> = ({
 
   // Always show close button
   const alwaysShowClose = true;
+
+  // Window control permissions
+  const canMinimize = window.resizable !== false;
+  const canMaximize = window.resizable !== false;
 
   // Minimize button handler
   const handleMinimize = (e: React.MouseEvent) => {
@@ -333,7 +354,7 @@ const Window: React.FC<WindowProps> = ({
       });
       onDrag(window.id, deltaX, deltaY);
     },
-    [drag, effectiveWidth, effectiveHeight, maxX, maxY, onDrag]
+    [drag, effectiveWidth, effectiveHeight, onDrag]
   );
 
   // Drag end - save position to store
@@ -449,7 +470,7 @@ const Window: React.FC<WindowProps> = ({
       onKeyDown={handleKeyDown}
       style={{
         // Z-index from zOrder
-        zIndex: zOrder.find((z) => z.windowId === window.id)?.zIndex ?? 1,
+        zIndex: zOrder?.find((z) => z.windowId === window.id)?.zIndex ?? 1,
         position: 'absolute',
         left: position.x,
         top: position.y,

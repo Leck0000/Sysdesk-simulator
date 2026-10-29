@@ -87,17 +87,19 @@ describe('Team Slice', () => {
     });
 
     it('should bounded the stream at 100 entries', () => {
-      const state = { progressStream: [] } as any;
+      let state = { progressStream: [] } as any;
 
       for (let i = 0; i < 101; i++) {
         const action = {
           type: teamSlice.actions.addProgressEntry.type,
           payload: { labId: String(i), progress: i, activeMachines: 1, timestamp: new Date().toISOString() },
         };
-        teamSlice.reducer(state, action);
+        state = teamSlice.reducer(state, action);
       }
 
       expect(state.progressStream).toHaveLength(100);
+      // Oldest entry (labId '0') is dropped
+      expect(state.progressStream[0].labId).toBe('1');
     });
   });
 

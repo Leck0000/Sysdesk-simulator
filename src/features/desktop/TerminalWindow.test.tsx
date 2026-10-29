@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
 import { desktopSlice } from './slice';
 import { TerminalWindow } from './TerminalWindow';
 
@@ -111,14 +112,15 @@ describe('TerminalWindow Component', () => {
     expect(windowDiv).toHaveAttribute('role', 'dialog');
   });
 
-  it('terminal has accessible role attribute', () => {
+  it('terminal has an accessible name', () => {
+    // The enclosing window is the dialog; nesting a second modal dialog
+    // inside it would be invalid ARIA, so the content region is labelled instead.
     const { container } = render(
       <Provider store={makeStore()}>
         <TerminalWindow windowId="test-window-1" />
       </Provider>
     );
     const terminalDiv = container.querySelector('[data-testid="terminal"]') as HTMLElement;
-    expect(terminalDiv).toHaveAttribute('role', 'dialog');
-    expect(terminalDiv).toHaveAttribute('aria-modal', 'true');
+    expect(terminalDiv).toHaveAttribute('aria-label', 'Terminal for test-window-1');
   });
 });

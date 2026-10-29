@@ -1,3 +1,195 @@
 /**
  * Certificate Verification Page — public page to verify a certificate's signature and payload
- *\n\n * Consumes: No auth required — public endpoint\n * Produces: VerificationPage (fetches `/api/certificates/validate`, shows payload + signature status)\n *\n * Strict TS: no `any`; use `unknown` + zod parsers at boundaries.\n * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.\n * Accessibility: WCAG 2.1 AA — focus-visible outlines, ARIA labels, keyboard navigation.\n * Responsive: >=1280px desktop; <1024px single-column.\n */\n\nimport React, { useState, useEffect, useSearchParams, useLocation, useNavigate } from 'react';\nimport { z } from 'zod';\n\n// ---------------------------------------------------------------------------\n// Zod schemas for verification boundary validation\n// ---------------------------------------------------------------------------\n\nconst VerificationResultSchema = z.object({\n  valid: z.boolean(),\n  payload: z\n    .object({\n      ticket_type: z.string(),\n      ticket_id: z.string(),\n      score: z.number(),\n      criteria_met: z.record(z.string(), z.number()),\n      issued_at: z.number(),\n    })\n    .optional(),\n  signature: z.string().optional(),\n  error: z.string().optional(),\n});\n\ntype VerificationResult = z.infer<typeof VerificationResultSchema>;\n\n// ---------------------------------------------------------------------------\n// VerificationPage component\n// ---------------------------------------------------------------------------\n\nexport const VerificationPage: React.FC = () => {\n  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);\n  const [isLoading, setIsLoading] = useState(false);\n  const [showError, setShowError] = useState(false);\n  const navigate = useNavigate();\n  const searchParams = useSearchParams();\n\n  // Check if we were redirected from a verification flow with type/id params\n  useEffect(() => {\n    const type = searchParams.get('type');\n    const id = searchParams.get('id');\n\n    if (type && id) {\n      // Fetch verification result\n      fetchVerificationResult(type, id);\n    }\n  }, [searchParams]);\n\n  // Fetch verification result from the public endpoint\n  const fetchVerificationResult = async (type: string, id: string) => {\n    setIsLoading(true);\n    setShowError(false);\n    try {\n      const response = await fetch('/api/certificates/validate', {\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n        },\n        body: JSON.stringify({ verificationId: id }),\n      });\n\n      const data = await response.json();\n\n      // Validate with Zod at boundary\n      const result = VerificationResultSchema.safeParse(data);\n      if (!result.success) {\n        setVerificationResult({\n          valid: false,\n          error: 'Invalid verification response from server',\n        });\n        return;\n      }\n\n      setVerificationResult(result.data);\n    } catch (err) {\n      const message = err instanceof Error ? err.message : 'Verification failed';\n      setVerificationResult({ valid: false, error: message });\n    } finally {\n      setIsLoading(false);\n    }\n  };\n\n  // Handle manual verification\n  const handleVerify = async (id: string) => {\n    await fetchVerificationResult(searchParams.get('type') || '', id);\n  };\n\n  if (isLoading) {\n    return (\n      <section\n        className=\"verification-page\"\n        aria-label=\"Certificate verification page\"\n      >\n        <div className=\"verification-page__content\">\n          <div className=\"animation-spin rounded-full h-12 w-12 border-b-2 border-var(--accent) mx-auto mb-4\"></div>\n          <p className=\"text-var(--muted)\">Verifying certificate...</p>\n        </div>\n      </section>\n    );\n  }\n\n  if (!verificationResult) {\n    return (\n      <section\n        className=\"verification-page\"\n        aria-label=\"Certificate verification page\"\n      >\n        <header className=\"verification-page__header\">\n          <h1 className=\"text-3xl font-bold text-var(--fg)\">\n            Verify Certificate\n          </h1>\n          <p className=\"text-var(--muted)\">\n            Enter a certificate verification ID to check its signature and payload.\n          </p>\n        </header>\n\n        <div className=\"verification-page__form\">\n          <p className=\"text-var(--muted) mb-4\">\n            Enter a certificate verification ID to check its signature and payload.\n          </p>\n\n          <div className=\"mb-4\">\n            <label className=\"block text-sm font-medium text-var(--fg) mb-2\">\n              Certificate ID\n            </label>\n            <input\n              type=\"text\"\n              className=\"w-full rounded-md border border-var(--border) p-3 focus:outline-none focus:ring-2 focus:ring-var(--accent) transition-colors\"\n              placeholder=\"cert-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\"\n              aria-label=\"Certificate verification ID\"\n            />\n          </div>\n\n          <button\n            onClick={() => handleVerify(searchParams.get('id') || '')}\n            className=\"btn-primary\"\n            disabled={isLoading}\n            aria-disabled={isLoading}\n          >\n            {isLoading ? 'Verifying...' : 'Verify Certificate'}\n          </button>\n        </div>\n      </section>\n    );\n  }\n\n  // Show verification result\n  return (\n    <section\n      className=\"verification-page\"\n      aria-label=\"Certificate verification result\"\n    >\n      <header className=\"verification-page__header\">\n        <h1 className=\"text-3xl font-bold text-var(--fg)\">\n          Verify Certificate\n        </h1>\n      </header>\n\n      <div className=\"max-w-2xl mx-auto py-8\">\n        {verificationResult.valid ? (\n          <div>\n            <h2 className=\"text-2xl font-bold text-var(--fg) mb-2\">\n              ✓ Certificate Valid\n            </h2>\n            <p className=\"text-var(--muted) mb-4\">\n              The certificate signature is valid and the payload is verified.\n            </p>\n\n            {verificationResult.payload && (\n              <div>\n                <p className=\"text-sm text-var(--muted) mb-1\">Ticket Type</p>\n                <p className=\"text-var(--fg) font-mono\">{verificationResult.payload.ticket_type}</p>\n              </div>\n              <div>\n                <p className=\"text-sm text-var(--muted) mb-1\">Ticket ID</p>\n                <p className=\"text-var(--fg) font-mono\">{verificationResult.payload.ticket_id}</p>\n              </div>\n              <div>\n                <p className=\"text-sm text-var(--muted) mb-1\">Score</p>\n                <p className=\"text-var(--fg) font-mono\">\n                  {verificationResult.payload.score}\n                </p>\n              </div>\n            </div>\n          ) : (\n            <div>\n              <h2 className=\"text-2xl font-bold text-var(--error) mb-2\">\n                ✗ Certificate Invalid\n              </h2>\n              <p className=\"text-var(--muted) mb-4\">\n                The certificate could not be verified. The signature may be tampered\n                or the certificate may be expired/revoked.\n              </p>\n              {verificationResult.error && (\n                <p className=\"text-var(--error) mb-4\">{verificationResult.error}</p>\n              )}\n            </div>\n          )}\n        </div>\n      </div>\n    </section>\n  );\n};\nEOF
+ *
+ * Consumes: No auth required — public endpoint
+ * Produces: VerificationPage (fetches `/api/certificates/validate`, shows payload + signature status)
+ *
+ * Strict TS: no `any`; use `unknown` + zod parsers at boundaries.
+ * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
+ * Accessibility: WCAG 2.1 AA — focus-visible outlines, ARIA labels, keyboard navigation.
+ * Responsive: >=1280px desktop; <1024px single-column.
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { z } from 'zod';
+
+// ---------------------------------------------------------------------------
+// Zod schemas for verification boundary validation
+// ---------------------------------------------------------------------------
+
+const VerificationResultSchema = z.object({
+  valid: z.boolean(),
+  payload: z
+    .object({
+      ticket_type: z.string(),
+      ticket_id: z.string(),
+      score: z.number(),
+      criteria_met: z.record(z.string(), z.number()),
+      issued_at: z.number(),
+    })
+    .optional(),
+  signature: z.string().optional(),
+  error: z.string().optional(),
+});
+
+export type VerificationResult = z.infer<typeof VerificationResultSchema>;
+
+export interface VerificationPageProps {
+  /** Pre-resolved result (e.g. tests or deep links); skips the initial fetch */
+  verificationResult?: VerificationResult;
+  /** Force the loading state */
+  isLoading?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// VerificationPage component
+// ---------------------------------------------------------------------------
+
+export const VerificationPage: React.FC<VerificationPageProps> = ({
+  verificationResult: initialResult,
+  isLoading: initialLoading = false,
+}) => {
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(
+    initialResult ?? null
+  );
+  const [isLoading, setIsLoading] = useState(initialLoading);
+  const [certificateId, setCertificateId] = useState('');
+
+  // Fetch verification result from the public endpoint
+  const fetchVerificationResult = useCallback(async (id: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/certificates/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verificationId: id }),
+      });
+
+      const data: unknown = await response.json();
+
+      // Validate with Zod at boundary
+      const result = VerificationResultSchema.safeParse(data);
+      setVerificationResult(
+        result.success
+          ? result.data
+          : { valid: false, error: 'Invalid verification response from server' }
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Verification failed';
+      setVerificationResult({ valid: false, error: message });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Auto-verify when linked with ?id=<verificationId>
+  useEffect(() => {
+    if (initialResult) return;
+    const id = new URLSearchParams(window.location.search).get('id');
+    if (id) {
+      setCertificateId(id);
+      void fetchVerificationResult(id);
+    }
+  }, [initialResult, fetchVerificationResult]);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const id = certificateId.trim();
+    if (id) void fetchVerificationResult(id);
+  };
+
+  if (isLoading) {
+    return (
+      <section className="verification-page" aria-label="Certificate verification page">
+        <div className="verification-page__content" role="status" aria-live="polite">
+          <p style={{ color: 'var(--fg)' }}>Verifying certificate...</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (!verificationResult) {
+    return (
+      <section className="verification-page" aria-label="Certificate verification page">
+        <header className="verification-page__header">
+          <h1 style={{ color: 'var(--fg)' }}>Verify Certificate</h1>
+          <p style={{ color: 'var(--fg)' }}>
+            Enter a certificate verification ID to check its signature and payload.
+          </p>
+        </header>
+
+        <form
+          className="verification-page__form"
+          aria-label="Certificate verification form"
+          onSubmit={handleSubmit}
+        >
+          <label htmlFor="certificate-id" style={{ color: 'var(--fg)' }}>
+            Certificate ID
+          </label>
+          <input
+            id="certificate-id"
+            type="text"
+            value={certificateId}
+            onChange={(e) => setCertificateId(e.target.value)}
+            placeholder="cert-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            style={{ border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--fg)' }}
+          />
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={!certificateId.trim()}
+            style={{ background: 'var(--accent)', color: 'var(--bg)' }}
+          >
+            Verify Certificate
+          </button>
+        </form>
+      </section>
+    );
+  }
+
+  // Show verification result
+  return (
+    <section className="verification-page" aria-label="Certificate verification result">
+      <header className="verification-page__header">
+        <h1 style={{ color: 'var(--fg)' }}>Verify Certificate</h1>
+      </header>
+
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+        {verificationResult.valid ? (
+          <div>
+            <h2 style={{ color: 'var(--fg)' }}>
+              <span aria-hidden="true">✓ </span>
+              <span>Certificate Valid</span>
+            </h2>
+            <p style={{ color: 'var(--fg)' }}>
+              The certificate signature is valid and the payload is verified.
+            </p>
+
+            {verificationResult.payload && (
+              <dl>
+                <dt>Ticket Type</dt>
+                <dd>{verificationResult.payload.ticket_type}</dd>
+                <dt>Ticket ID</dt>
+                <dd>{verificationResult.payload.ticket_id}</dd>
+                <dt>Score</dt>
+                <dd>{verificationResult.payload.score}</dd>
+              </dl>
+            )}
+          </div>
+        ) : (
+          <div role="alert">
+            <h2 style={{ color: 'var(--accent)' }}>
+              <span aria-hidden="true">✗ </span>
+              <span>Certificate Invalid</span>
+            </h2>
+            <p style={{ color: 'var(--fg)' }}>
+              The certificate could not be verified. The signature may be tampered or the
+              certificate may be expired/revoked.
+            </p>
+            {verificationResult.error && <p>{verificationResult.error}</p>}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};

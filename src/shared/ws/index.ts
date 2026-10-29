@@ -12,5 +12,5 @@ export { parseEnvelope, createEnvelope } from './envelope';
 export type { WSEnvelope, ClientToServerPayload, ServerToClientPayload } from './envelope';
 export type { WSActionType, ClientEventType, ServerEventType } from './events';
 export type { WSClient } from './client';
-export type { WSState } from './ws/middleware';
-export { wsMiddleware } from './ws/middleware';
+export type { WSState } from './middleware';
+export { wsMiddleware } from './middleware';

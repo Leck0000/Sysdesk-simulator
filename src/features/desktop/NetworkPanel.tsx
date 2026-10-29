@@ -22,14 +22,14 @@ import { desktopSlice } from './slice';
 // Network state schema
 const NetworkInterfaceSchema = z.object({
   name: z.string(),
-  ip: z.string().ip(),
+  ip: z.union([z.ipv4(), z.ipv6()]),
   mac: z.string().optional(),
 });
 
 const NetworkAdapterSchema = z.object({
   name: z.string(),
   status: z.enum(['up', 'down', 'degraded']),
-  ip: z.string().ip().optional(),
+  ip: z.union([z.ipv4(), z.ipv6()]).optional(),
   netmask: z.string().optional(),
   mac: z.string().optional(),
 });

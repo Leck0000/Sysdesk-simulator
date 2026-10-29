@@ -222,6 +222,8 @@ const TerminalWindow: React.FC<TerminalWindowProps> = ({ windowId, className }) 
   return (
     <div
       data-testid="terminal-window"
+      role="dialog"
+      aria-label={`Terminal window ${windowId}`}
       className={className}
       style={{
         // Theming via CSS variables - no hardcoded colors
@@ -279,3 +281,6 @@ const TerminalWindow: React.FC<TerminalWindowProps> = ({ windowId, className }) 
     </div>
   );
 };
+
+export { TerminalWindow };
+export type { TerminalWindowProps };

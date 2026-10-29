@@ -9,7 +9,16 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import { desktopSlice } from '../../features/desktop/slice';
 import { Window } from '../../features/desktop/WindowManager';
+
+const makeStore = () => configureStore({
+  reducer: {
+    desktop: desktopSlice.reducer,
+  },
+});
 
 describe('Window component', () => {
   const window = {
@@ -32,15 +41,19 @@ describe('Window component', () => {
 
   it('renders titlebar with window title', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={window}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
     const titlebar = container.querySelector('[data-testid="window-titlebar"]');
     expect(titlebar).toBeInTheDocument();
@@ -49,15 +62,19 @@ describe('Window component', () => {
 
   it('renders window title in title span', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={window}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
     const title = container.querySelector('[data-testid="window-title"]');
     expect(title).toBeInTheDocument();
@@ -66,15 +83,19 @@ describe('Window component', () => {
 
   it('renders minimize button when window can be minimized', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={window}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
     const minimizeBtn = container.querySelector('[data-testid="window-minimize"]');
     expect(minimizeBtn).toBeInTheDocument();
@@ -82,15 +103,19 @@ describe('Window component', () => {
 
   it('renders maximize button when window can be maximized', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={window}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
     const maximizeBtn = container.querySelector('[data-testid="window-maximize"]');
     expect(maximizeBtn).toBeInTheDocument();
@@ -98,15 +123,19 @@ describe('Window component', () => {
 
   it('renders close button', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={window}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
     const closeBtn = container.querySelector('[data-testid="window-close"]');
     expect(closeBtn).toBeInTheDocument();
@@ -114,15 +143,19 @@ describe('Window component', () => {
 
   it('applies theming via CSS variables', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={window}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
     const titlebar = container.querySelector('[data-testid="window-titlebar"]');
     expect(titlebar).toBeInTheDocument();
@@ -133,17 +166,21 @@ describe('Window component', () => {
 
   it('applies card styling via CSS variables', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={window}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
-    const windowDiv = container.querySelector('[data-testid="window-1"]');
+    const windowDiv = container.querySelector('[data-testid="window-test-window-1"]');
     expect(windowDiv).toBeInTheDocument();
     const style = windowDiv?.getAttribute('style') || '';
     expect(style).toContain('var(--card)');
@@ -153,15 +190,19 @@ describe('Window component', () => {
 
   it('renders title drag handle when window can be dragged', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={window}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
     const dragHandle = container.querySelector('[data-testid="title-drag-handle"]');
     expect(dragHandle).toBeInTheDocument();
@@ -169,15 +210,19 @@ describe('Window component', () => {
 
   it('shows resize handle when window can be resized', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={window}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
     const resizeHandle = container.querySelector('[data-testid="resize-se"]');
     expect(resizeHandle).toBeInTheDocument();
@@ -185,15 +230,19 @@ describe('Window component', () => {
 
   it('hides resize handle when window is minimized', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={{ ...window, minimized: true, state: 'minimized' }}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
     const resizeHandle = container.querySelector('[data-testid="resize-se"]');
     expect(resizeHandle).not.toBeInTheDocument();
@@ -201,15 +250,19 @@ describe('Window component', () => {
 
   it('hides resize handle when window is maximized', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={{ ...window, maximized: true, state: 'maximized' }}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
     const resizeHandle = container.querySelector('[data-testid="resize-se"]');
     expect(resizeHandle).not.toBeInTheDocument();
@@ -217,17 +270,21 @@ describe('Window component', () => {
 
   it('renders correct positioning and sizing', () => {
     const { container } = render(
-      <Window
-        window={window}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={window}
+          active={true}
+          activeWindowId={window.id}
+          zOrder={[{ windowId: window.id, zIndex: 1 }]}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
-    const windowDiv = container.querySelector('[data-testid="window-1"]');
+    const windowDiv = container.querySelector('[data-testid="window-test-window-1"]');
     expect(windowDiv).toBeInTheDocument();
     const style = windowDiv?.getAttribute('style') || '';
     expect(style).toContain('left: 100px');
@@ -239,17 +296,20 @@ describe('Window component', () => {
   it('applies effective dimensions when maximized', () => {
     const maximizedWindow = { ...window, maximized: true, innerWidth: 800, innerHeight: 600 };
     const { container } = render(
-      <Window
-        window={maximizedWindow}
-        active={true}
-        onMinimize={() => {}}
-        onMaximize={() => {}}
-        onClose={() => {}}
-        onResize={() => {}}
-        onDrag={() => {}}
-      />
+      <Provider store={makeStore()}>
+        <Window
+          window={maximizedWindow}
+          active={true}
+          activeWindowId={maximizedWindow.id}
+          onMinimize={() => {}}
+          onMaximize={() => {}}
+          onClose={() => {}}
+          onResize={() => {}}
+          onDrag={() => {}}
+        />
+      </Provider>
     );
-    const windowDiv = container.querySelector('[data-testid="window-1"]');
+    const windowDiv = container.querySelector('[data-testid="window-test-window-1"]');
     expect(windowDiv).toBeInTheDocument();
     const style = windowDiv?.getAttribute('style') || '';
     expect(style).toContain('width: 800px');

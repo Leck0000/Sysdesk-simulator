@@ -90,9 +90,10 @@ describe('WSClient Infrastructure', () => {
       // Connection will fail in test environment (no server),
       // but we test the structure
       const connectPromise = client.connect();
-      // Connection should reject or resolve depending on server
-      // Just verify the promise exists
       expect(connectPromise).toBeInstanceOf(Promise);
+      // No server in jsdom: the attempt must fail cleanly (handled, not unhandled)
+      await expect(connectPromise).rejects.toThrow();
+      client.disconnect();
     });
   });
 
