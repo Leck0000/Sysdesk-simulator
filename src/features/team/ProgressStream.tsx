@@ -17,8 +17,7 @@
 
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectProgressStream, selectTeamStatus, selectTeamError } from './api';
-import { clearProgressStream } from './slice';
+import { clearProgressStream, selectProgressStream, selectTeamStatus, selectTeamError } from './slice';
 
 export const ProgressStream: React.FC = () => {
   const dispatch = useDispatch();

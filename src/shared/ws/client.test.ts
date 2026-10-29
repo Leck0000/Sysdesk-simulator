@@ -40,12 +40,12 @@ describe('WSClient Infrastructure', () => {
     });
 
     it('should return null for invalid JSON', () => {
-      const result = parseEnvelope({} as any);
+      const result = parseEnvelope({});
       expect(result).toBeNull();
     });
 
     it('should return null for missing required fields', () => {
-      const result = parseEnvelope({ v: 0 } as any);
+      const result = parseEnvelope({ v: 0 });
       expect(result).toBeNull();
     });
   });

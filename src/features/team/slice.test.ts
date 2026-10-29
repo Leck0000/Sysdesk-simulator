@@ -1,133 +1,86 @@
-/** Team slice reducer tests */
-/* Strict TS: no `any`; use `unknown` + zod parsers at boundaries.
- * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
- * Accessibility: WCAG 2.1 AA. */
-
+/** Team slice reducer tests (typed fixtures, no casts) */
 import { describe, it, expect } from 'vitest';
-import { teamSlice } from './slice';
+import reducer, {
+  clearTeamState,
+  setSelectedAssignment,
+  clearSelectedAssignment,
+  addProgressEntry,
+  clearProgressStream,
+  resetBulkImport,
+} from './slice';
+import type { Assignment, CohortStudent, LabProgress } from './api';
+
+type TeamState = ReturnType<typeof reducer>;
+const init = (): TeamState => reducer(undefined, { type: '@@INIT' });
+
+const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const now = new Date().toISOString();
+
+const student: CohortStudent = {
+  id: uuid(1), name: 'Test', role: 'technician', labId: uuid(9), progress: 50, status: 'running', lastActive: now,
+};
+const assignment: Assignment = {
+  id: uuid(2), title: 'Test Assignment', description: '', labId: uuid(9), cohortId: uuid(8), status: 'open', createdAt: now,
+};
+const progress = (i: number): LabProgress => ({ labId: uuid(i), progress: i % 100, activeMachines: 1, timestamp: now });
 
 describe('Team Slice', () => {
-  describe('initial state', () => {
-    it('should have default values', () => {
-      const initialState = teamSlice.reducer(undefined, { type: '@@INIT' });
-      expect(initialState.cohort).toEqual([]);
-      expect(initialState.assignments).toEqual([]);
-      expect(initialState.progressStream).toEqual([]);
-      expect(initialState.bulkImport).toBeNull();
-      expect(initialState.status).toBe('idle');
-      expect(initialState.selectedAssignment).toBeNull();
-      expect(initialState.error).toBeNull();
+  it('has default values', () => {
+    expect(init()).toEqual({
+      cohort: [],
+      assignments: [],
+      progressStream: [],
+      bulkImport: null,
+      status: 'idle',
+      selectedAssignment: null,
+      error: null,
     });
   });
 
-  describe('clearTeamState', () => {
-    it('should reset all team state', () => {
-      const state = {
-        cohort: [{ id: '1', name: 'Test', progress: 50, status: 'running' }],
-        assignments: [{ id: '2', title: 'Test', status: 'open' }],
-        progressStream: [{ labId: '3', progress: 25, activeMachines: 1 }],
-        bulkImport: { success: true, imported: 5, failed: 0 },
-        status: 'succeeded',
-        selectedAssignment: { id: '4', title: 'Test' },
-        error: 'some error',
-      } as any;
-
-      const action = { type: teamSlice.actions.clearTeamState.type };
-      const nextState = teamSlice.reducer(state, action);
-
-      expect(nextState.cohort).toEqual([]);
-      expect(nextState.assignments).toEqual([]);
-      expect(nextState.progressStream).toEqual([]);
-      expect(nextState.bulkImport).toBeNull();
-      expect(nextState.status).toBe('idle');
-      expect(nextState.selectedAssignment).toBeNull();
-      expect(nextState.error).toBeNull();
-    });
+  it('clearTeamState resets all team state', () => {
+    const dirty: TeamState = {
+      cohort: [student],
+      assignments: [assignment],
+      progressStream: [progress(3)],
+      bulkImport: { success: true, imported: 5, failed: 0, errors: [] },
+      status: 'succeeded',
+      selectedAssignment: assignment,
+      error: 'some error',
+    };
+    expect(reducer(dirty, clearTeamState())).toEqual(init());
   });
 
-  describe('setSelectedAssignment', () => {
-    it('should set the selected assignment', () => {
-      const state = { selectedAssignment: null } as any;
-
-      const action = {
-        type: teamSlice.actions.setSelectedAssignment.type,
-        payload: { id: '1', title: 'Test Assignment' },
-      };
-
-      const nextState = teamSlice.reducer(state, action);
-      expect(nextState.selectedAssignment).toEqual(action.payload);
-    });
-  });
-
-  describe('clearSelectedAssignment', () => {
-    it('should clear the selected assignment', () => {
-      const state = { selectedAssignment: { id: '1', title: 'Test' } } as any;
-
-      const action = { type: teamSlice.actions.clearSelectedAssignment.type };
-
-      const nextState = teamSlice.reducer(state, action);
-      expect(nextState.selectedAssignment).toBeNull();
-    });
+  it('setSelectedAssignment / clearSelectedAssignment', () => {
+    let state = reducer(init(), setSelectedAssignment(assignment));
+    expect(state.selectedAssignment).toEqual(assignment);
+    state = reducer(state, clearSelectedAssignment());
+    expect(state.selectedAssignment).toBeNull();
   });
 
   describe('addProgressEntry', () => {
-    it('should add a progress entry to the stream', () => {
-      const state = { progressStream: [] } as any;
-
-      const entry = { labId: '1', progress: 50, activeMachines: 1, timestamp: new Date().toISOString() };
-
-      const action = {
-        type: teamSlice.actions.addProgressEntry.type,
-        payload: entry,
-      };
-
-      const nextState = teamSlice.reducer(state, action);
-      expect(nextState.progressStream).toHaveLength(1);
-      expect(nextState.progressStream[0]).toEqual(entry);
+    it('adds a progress entry to the stream', () => {
+      const entry = progress(1);
+      const state = reducer(init(), addProgressEntry(entry));
+      expect(state.progressStream).toEqual([entry]);
     });
 
-    it('should bounded the stream at 100 entries', () => {
-      let state = { progressStream: [] } as any;
-
-      for (let i = 0; i < 101; i++) {
-        const action = {
-          type: teamSlice.actions.addProgressEntry.type,
-          payload: { labId: String(i), progress: i, activeMachines: 1, timestamp: new Date().toISOString() },
-        };
-        state = teamSlice.reducer(state, action);
-      }
-
+    it('bounds the stream at 100 entries, dropping the oldest', () => {
+      let state = init();
+      for (let i = 0; i < 101; i++) state = reducer(state, addProgressEntry(progress(i)));
       expect(state.progressStream).toHaveLength(100);
-      // Oldest entry (labId '0') is dropped
-      expect(state.progressStream[0].labId).toBe('1');
+      expect(state.progressStream[0]?.labId).toBe(uuid(1));
     });
   });
 
-  describe('clearProgressStream', () => {
-    it('should clear the progress stream', () => {
-      const state = {
-        progressStream: [{ labId: '1', progress: 50, activeMachines: 1, timestamp: new Date().toISOString() }],
-      } as any;
-
-      const action = { type: teamSlice.actions.clearProgressStream.type };
-
-      const nextState = teamSlice.reducer(state, action);
-      expect(nextState.progressStream).toEqual([]);
-    });
+  it('clearProgressStream empties the stream', () => {
+    const state = reducer(reducer(init(), addProgressEntry(progress(1))), clearProgressStream());
+    expect(state.progressStream).toEqual([]);
   });
 
-  describe('resetBulkImport', () => {
-    it('should reset bulk import state', () => {
-      const state = {
-        bulkImport: { success: true, imported: 5, failed: 0, errors: [] },
-        status: 'succeeded',
-      } as any;
-
-      const action = { type: teamSlice.actions.resetBulkImport.type };
-
-      const nextState = teamSlice.reducer(state, action);
-      expect(nextState.bulkImport).toBeNull();
-      expect(nextState.status).toBe('idle');
-    });
+  it('resetBulkImport clears the result and status', () => {
+    const dirty: TeamState = { ...init(), bulkImport: { success: true, imported: 5, failed: 0, errors: [] }, status: 'succeeded' };
+    const state = reducer(dirty, resetBulkImport());
+    expect(state.bulkImport).toBeNull();
+    expect(state.status).toBe('idle');
   });
 });

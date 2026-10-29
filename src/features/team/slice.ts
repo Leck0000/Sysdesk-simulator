@@ -8,10 +8,17 @@
 /* CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
 */
 
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { z } from 'zod';
 import type { RootState, AppDispatch } from '../../app/store';
-import { teamApi } from './api';
+import { teamApi, type Assignment, type BulkImportResult, type CohortStudent, type LabProgress } from './api';
+
+/** Message from an RTK Query / thrown error, for rejectWithValue. */
+const errorMessage = (err: unknown, fallback: string): string => {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object' && err !== null && 'error' in err && typeof err.error === 'string') return err.error;
+  return fallback;
+};
 
 interface CohortProgress {
   labId: string;
@@ -22,11 +29,11 @@ interface CohortProgress {
 
 const initialTeamState = {
   // Cohort roster — students in the current cohort
-  cohort: [] as CohortStudent,
+  cohort: [] as CohortStudent[],
   // Current assignments
-  assignments: [] as Assignment,
+  assignments: [] as Assignment[],
   // Lab progress stream entries
-  progressStream: [] as LabProgress,
+  progressStream: [] as LabProgress[],
   // Bulk import result
   bulkImport: null as BulkImportResult | null,
   // Status flags
@@ -37,11 +44,6 @@ const initialTeamState = {
   error: null as string | null,
 };
 
-// Type aliases — inferred from api.ts schemas
-type CohortStudent = any;
-type Assignment = any;
-type LabProgress = any;
-type BulkImportResult = any;
 
 // Async thunks
 
@@ -51,8 +53,8 @@ export const fetchCohort = createAsyncThunk(
     try {
       const result = await dispatch(teamApi.endpoints.cohortQuery.initiate()).unwrap();
       return result;
-    } catch (err: any) {
-      return rejectWithValue(err.message ?? 'Failed to fetch cohort');
+    } catch (err: unknown) {
+      return rejectWithValue(errorMessage(err, 'Failed to fetch cohort'));
     }
   }
 );
@@ -65,8 +67,8 @@ export const fetchAssignments = createAsyncThunk(
         teamApi.endpoints.assignmentsQuery.initiate(cohortId)
       ).unwrap();
       return result;
-    } catch (err: any) {
-      return rejectWithValue(err.message ?? 'Failed to fetch assignments');
+    } catch (err: unknown) {
+      return rejectWithValue(errorMessage(err, 'Failed to fetch assignments'));
     }
   }
 );
@@ -81,8 +83,8 @@ export const createAssignment = createAsyncThunk(
       // Refetch cohort after create
       dispatch(fetchCohort());
       return result;
-    } catch (err: any) {
-      return rejectWithValue(err.message ?? 'Failed to create assignment');
+    } catch (err: unknown) {
+      return rejectWithValue(errorMessage(err, 'Failed to create assignment'));
     }
   }
 );
@@ -96,10 +98,11 @@ export const bulkImport = createAsyncThunk(
       ).unwrap();
       // Refetch after import
       dispatch(fetchCohort());
-      dispatch(fetchAssignments(formData.get('cohortId') as string));
+      const cohortId = formData.get('cohortId');
+      if (typeof cohortId === 'string') dispatch(fetchAssignments(cohortId));
       return result;
-    } catch (err: any) {
-      return rejectWithValue(err.message ?? 'Failed to bulk import');
+    } catch (err: unknown) {
+      return rejectWithValue(errorMessage(err, 'Failed to bulk import'));
     }
   }
 );
@@ -112,8 +115,8 @@ export const subscribeLabProgressThunk = createAsyncThunk(
         teamApi.endpoints.subscribeLabProgress.initiate(labId)
       ).unwrap();
       return result;
-    } catch (err: any) {
-      return rejectWithValue(err.message ?? 'Failed to subscribe to lab progress');
+    } catch (err: unknown) {
+      return rejectWithValue(errorMessage(err, 'Failed to subscribe to lab progress'));
     }
   }
 );
@@ -136,7 +139,7 @@ export const teamSlice = createSlice({
     },
 
     /** Set the selected assignment (for AssignmentView) */
-    setSelectedAssignment: (state, action) => {
+    setSelectedAssignment: (state, action: PayloadAction<Assignment | null>) => {
       state.selectedAssignment = action.payload;
     },
 
@@ -152,7 +155,7 @@ export const teamSlice = createSlice({
     },
 
     /** Add a lab progress entry to the stream */
-    addProgressEntry: (state, action) => {
+    addProgressEntry: (state, action: PayloadAction<LabProgress>) => {
       state.progressStream.push(action.payload);
       // Keep stream bounded — drop oldest if over 100 entries
       if (state.progressStream.length > 100) {
@@ -176,5 +179,12 @@ export const {
   addProgressEntry,
   clearProgressStream,
 } = teamSlice.actions;
+
+// Selectors
+export const selectCohort = (state: RootState) => state.team.cohort;
+export const selectProgressStream = (state: RootState) => state.team.progressStream;
+export const selectTeamStatus = (state: RootState) => state.team.status;
+export const selectTeamError = (state: RootState) => state.team.error;
+export const selectSelectedAssignment = (state: RootState) => state.team.selectedAssignment;
 
 export default teamSlice.reducer;

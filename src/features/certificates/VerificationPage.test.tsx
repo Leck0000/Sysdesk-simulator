@@ -1,3 +1,5 @@
+import authReducer from '../auth/slice';
+import certificatesReducer from './slice';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -17,10 +19,7 @@ global.matchMedia = global.matchMedia || ((params: string) => ({
 }));
 
 const store = configureStore({
-  reducer: {
-    auth: (state = { accessToken: '', user: null, roles: [], status: 'idle' }) => state,
-    certificates: (state = { galleryUserId: null, galleryLabId: null, galleryFilterStatus: 'all', selectedCertificate: null, uiStatus: 'idle', error: null }) => state,
-  } as any,
+  reducer: { auth: authReducer, certificates: certificatesReducer },
 });
 
 describe('VerificationPage', () => {

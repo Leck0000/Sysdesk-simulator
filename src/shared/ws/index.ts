@@ -11,5 +11,6 @@ export { wsAckSent, wsAckReceived, wsAckTimeout, wsError } from './events';
 export { isWSAction, isWSMessageAction } from './events';
 export { parseEnvelope, createEnvelope } from './envelope';
 export type { WSEnvelope, ClientToServerPayload, ServerToClientPayload } from './envelope';
-export type { WSActionType, ClientEventType, ServerEventType } from './events';
+export type { WSActionType } from './events';
+export { ServerEventType } from './envelope';
 export type { WSClient } from './client';

@@ -8,7 +8,9 @@
  * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
  */
 
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { apiBaseQuery } from '../../shared/api/baseQuery';
+import { isMutationPending } from '../../shared/api/pending';
 import { z } from 'zod';
 import type { RootState } from '../../app/store';
 
@@ -72,21 +74,7 @@ export type RevokeResponse = z.infer<typeof RevokeResponseSchema>;
 
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({
-    // fetchBaseQuery options: we inject the token per-request via prepareHeaders
-    prepareHeaders: (headers, { getState }) => {
-      const state = getState();
-      // Type-safe accessor — the auth slice stores accessToken as string
-      const accessToken = (state && typeof state === 'object' && 'auth' in state && typeof (state as { auth: { accessToken: string } }).auth.accessToken === 'string')
-        ? (state as { auth: { accessToken: string } }).auth.accessToken
-        : '';
-      if (accessToken) {
-        headers.set('Authorization', `Bearer ${accessToken}`);
-      }
-      return headers;
-    },
-    credentials: 'include', // refreshToken lives in httpOnly cookie
-  }),
+  baseQuery: apiBaseQuery,
   tagTypes: ['Auth'],
   endpoints: (builder) => ({
     /** POST /auth/login */
@@ -148,12 +136,9 @@ export const revokeMutationThunk = authApi.endpoints.revokeMutation.initiate;
 /** Raw RTK Query cache for the auth API. */
 export const selectAuthApiState = (state: RootState) => state.authApi;
 
-const isMutationPending = (state: RootState, endpointName: string): boolean =>
-  Object.values(state.authApi.mutations).some((m) => m?.endpointName === endpointName && m.status === 'pending');
-
-export const selectIsLoggingIn = (state: RootState) => isMutationPending(state, 'loginMutation');
-export const selectIsRefreshing = (state: RootState) => isMutationPending(state, 'refreshMutation');
-export const selectIsRevoking = (state: RootState) => isMutationPending(state, 'revokeMutation');
+export const selectIsLoggingIn = (state: RootState) => isMutationPending(state.authApi, 'loginMutation');
+export const selectIsRefreshing = (state: RootState) => isMutationPending(state.authApi, 'refreshMutation');
+export const selectIsRevoking = (state: RootState) => isMutationPending(state.authApi, 'revokeMutation');
 
 // ---------------------------------------------------------------------------
 // NOTE: RTK Query loading state for mutations is accessed via the selectors

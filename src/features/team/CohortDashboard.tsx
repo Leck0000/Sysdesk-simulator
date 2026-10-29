@@ -15,7 +15,6 @@ import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Recharts } from 'recharts';
-import { selectCohort, selectProgressStream, selectTeamStatus, selectTeamError } from './api';
 import { clearTeamState, clearProgressStream } from './slice';
 
 // Student progress bar constants
@@ -181,7 +180,7 @@ export const CohortDashboard: React.FC = () => {
       </div>
 
       {/* Progress line chart */}
-      <div>{ProgressLineChart({ data: progressLineData } as any)}</div>
+      <div><ProgressLineChart data={progressLineData} /></div>
 
       {/* Real-time progress stream */}
       <div className="mt-3 p-3 rounded-md" style={{ background: 'var(--card)' }}>

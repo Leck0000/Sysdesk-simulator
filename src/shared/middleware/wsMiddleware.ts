@@ -8,7 +8,8 @@ import {
   type WSConnectPayload,
   type WSSendPayload,
 } from '../ws/events';
-import { ServerEventType, ScoringUpdatePayloadSchema } from '../ws/envelope';
+import { ServerEventType, ScoringUpdatePayloadSchema, CommandOutputPayloadSchema } from '../ws/envelope';
+import { appendTerminalOutput } from '../../features/desktop/slice';
 
 // WebSocket middleware: intercepts Redux WS actions and manages the
 // single WebSocket connection via WSClient. All WebSocket messages go
@@ -57,14 +58,11 @@ export const wsMiddleware: Middleware = (store) => (next) => (action) => {
   if (isWSMessageAction(action)) {
     const { envelope } = action.payload;
     if (envelope.t === ServerEventType.COMMAND_OUTPUT) {
-      const { machineId, output } = envelope.payload as {
-        machineId: string;
-        output: string;
-      };
-      store.dispatch({
-        type: 'terminal/command_output',
-        payload: { machineId, output },
-      });
+      const parsed = CommandOutputPayloadSchema.safeParse(envelope.payload);
+      if (parsed.success) {
+        const { machineId, output } = parsed.data;
+        store.dispatch(appendTerminalOutput({ machineId, output }));
+      }
     }
     if (envelope.t === ServerEventType.SCORING_UPDATE) {
       const scoringUpdate = ScoringUpdatePayloadSchema.safeParse(envelope.payload);

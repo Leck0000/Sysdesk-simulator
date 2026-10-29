@@ -16,8 +16,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { selectIsBulkImportLoading, resetBulkImport } from './api';
-import { selectCohort } from './api';
+import { selectIsBulkImportLoading } from './api';
 import { resetBulkImport as resetBulkImportSlice } from './slice';
 import { useNotification } from '../shared/components/Notification';
 
@@ -67,12 +66,12 @@ export const BulkImport: React.FC = () => {
       ).unwrap();
 
       setImportResult(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setImportResult({
         success: false,
         imported: 0,
         failed: 1,
-        errors: [{ row: 0, error: err.message ?? 'Import failed' }],
+        errors: [{ row: 0, error: err instanceof Error ? err.message : 'Import failed' }],
       });
     } finally {
       setIsSubmitting(false);

@@ -246,8 +246,10 @@ export function isWSMessageAction<T>(
   if (!isWSAction(action) || action.type !== WSActionType.MESSAGE) {
     return false;
   }
-  if (eventType && 'envelope' in action.payload) {
-    return (action.payload as { envelope: WSEnvelope }).envelope.t === eventType;
+  const { payload } = action;
+  if (eventType && typeof payload === 'object' && payload !== null && 'envelope' in payload) {
+    const { envelope } = payload;
+    return typeof envelope === 'object' && envelope !== null && 't' in envelope && envelope.t === eventType;
   }
   return true;
 }

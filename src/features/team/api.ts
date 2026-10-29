@@ -7,7 +7,10 @@
  * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
  */
 
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { apiBaseQuery } from '../../shared/api/baseQuery';
+import { isMutationPending, isQueryPending } from '../../shared/api/pending';
+import type { RootState } from '../../app/store';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -66,23 +69,7 @@ export type BulkImportResult = z.infer<typeof BulkImportResultSchema>;
 
 export const teamApi = createApi({
   reducerPath: 'teamApi',
-  baseQuery: fetchBaseQuery({
-    prepareHeaders: (headers, { getState }) => {
-      const state = getState();
-      // Type-safe accessor — read accessToken from auth slice
-      const accessToken = (state &&
-        typeof state === 'object' &&
-        'auth' in state &&
-        typeof (state as { auth: { accessToken: string } }).auth.accessToken === 'string')
-        ? (state as { auth: { accessToken: string } }).auth.accessToken
-        : '';
-      if (accessToken) {
-        headers.set('Authorization', `Bearer ${accessToken}`);
-      }
-      return headers;
-    },
-    credentials: 'include',
-  }),
+  baseQuery: apiBaseQuery,
   tagTypes: ['Team'],
   endpoints: (builder) => ({
     /** GET /team/cohort — fetch current cohort roster */
@@ -150,20 +137,6 @@ export const {
 // Reduced selectors for the derived data the slice consumes
 // ---------------------------------------------------------------------------
 
-// Helper to check if cohort query is currently loading
-export const selectIsCohortLoading = (state: any) => {
-  const running = teamApi.util.selectors.getRunningQueriesMap(state)[teamApi.endpoints.cohortQuery.selector];
-  return !!(running?.pending !== undefined);
-};
-
-// Helper to check if assignments query is currently loading
-export const selectIsAssignmentsLoading = (state: any) => {
-  const running = teamApi.util.selectors.getRunningQueriesMap(state)[teamApi.endpoints.assignmentsQuery.selector];
-  return !!(running?.pending !== undefined);
-};
-
-// Helper to check if bulk import mutation is currently loading
-export const selectIsBulkImportLoading = (state: any) => {
-  const running = teamApi.util.selectors.getRunningQueriesMap(state)[teamApi.endpoints.bulkImportMutation.selector];
-  return !!(running?.pending !== undefined);
-};
+export const selectIsCohortLoading = (state: RootState) => isQueryPending(state.teamApi, 'cohortQuery');
+export const selectIsAssignmentsLoading = (state: RootState) => isQueryPending(state.teamApi, 'assignmentsQuery');
+export const selectIsBulkImportLoading = (state: RootState) => isMutationPending(state.teamApi, 'bulkImportMutation');

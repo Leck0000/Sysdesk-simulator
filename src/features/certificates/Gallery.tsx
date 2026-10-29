@@ -14,6 +14,7 @@ import React, { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useListCertificatesQuery } from '../../features/certificates/api';
 import { z } from 'zod';
+import type { RootState } from '../../app/store';
 import {
   setGalleryUserFilter,
   setGalleryLabFilter,
@@ -108,13 +109,13 @@ export const CertificateGallery: React.FC = () => {
 
   // Get gallery filters from certificates slice state
   const galleryUserFilter = useSelector(
-    (state: any) => state.certificates.galleryUserId
+    (state: RootState) => state.certificates.galleryUserId
   );
   const galleryLabFilter = useSelector(
-    (state: any) => state.certificates.galleryLabId
+    (state: RootState) => state.certificates.galleryLabId
   );
   const galleryFilterStatus = useSelector(
-    (state: any) => state.certificates.galleryFilterStatus
+    (state: RootState) => state.certificates.galleryFilterStatus
   );
 
   // Determine if we should use lazy or regular query
@@ -126,10 +127,8 @@ export const CertificateGallery: React.FC = () => {
     error,
   } = useListCertificatesQuery(
     authUserId ? { userId: authUserId } : undefined,
-    {
-      // enabled only fetches when there's a userId or when explicitly needed
-      enabled: authUserId !== undefined,
-    }
+    // Only fetch once we know who the user is.
+    { skip: !authUserId }
   );
 
   // Apply additional filters from the slice state
@@ -146,7 +145,7 @@ export const CertificateGallery: React.FC = () => {
   const items: GalleryItem[] = data
     ? data
         .filter(
-          (item: any) =>
+          (item) =>
             (!galleryUserFilter || item.userId === galleryUserFilter) &&
             (galleryFilterStatus === 'all' ||
               // Simple status filtering based on expiry
@@ -154,16 +153,16 @@ export const CertificateGallery: React.FC = () => {
                 !item.signedPayload.expiresAt) ||
               (galleryFilterStatus === 'expired' &&
                 item.signedPayload.expiresAt) ||
-              (galleryFilterStatus === 'revoked', false))
+              galleryFilterStatus === 'revoked')
         )
         .filter(
-          (item: any) =>
+          (item) =>
             !galleryLabFilter || item.labId === galleryLabFilter
         )
     : [];
 
   const errorMsg = useSelector(
-    (state: any) => state.certificates.error
+    (state: RootState) => state.certificates.error
   );
 
   return (

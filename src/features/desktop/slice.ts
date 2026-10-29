@@ -57,7 +57,12 @@ export interface DesktopState {
   zOrder: ZOrder[];
   // Currently active window ID
   activeWindowId: ActiveWindowId;
+  // Terminal output chunks per machine (from ws command_output), newest last
+  terminalOutput: Record<string, string[]>;
 }
+
+/** Max output chunks retained per machine. */
+export const TERMINAL_OUTPUT_LIMIT = 500;
 
 // ---------------------------------------------------------------------------
 // Initial state
@@ -67,6 +72,7 @@ const initialState: DesktopState = {
   windows: [],
   zOrder: [],
   activeWindowId: undefined,
+  terminalOutput: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -160,6 +166,14 @@ export const desktopSlice = createSlice({
         state.zOrder.push({ windowId: action.payload, zIndex: top + 1 });
       }
       state.activeWindowId = action.payload;
+    },
+
+    /** Append command output for a machine's terminal(s) */
+    appendTerminalOutput: (state, action: PayloadAction<{ machineId: string; output: string }>) => {
+      const { machineId, output } = action.payload;
+      const chunks = (state.terminalOutput[machineId] ??= []);
+      chunks.push(output);
+      if (chunks.length > TERMINAL_OUTPUT_LIMIT) chunks.splice(0, chunks.length - TERMINAL_OUTPUT_LIMIT);
     },
 
     /** Activate a window (set as active) */
@@ -270,6 +284,7 @@ export const {
   setZOrder,
   activateWindow,
   focusWindow,
+  appendTerminalOutput,
   minimizeWindow,
   maximizeWindow,
   restoreWindow,

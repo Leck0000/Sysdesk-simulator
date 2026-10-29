@@ -8,7 +8,8 @@
  * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
  */
 
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { apiBaseQuery } from '../../shared/api/baseQuery';
 import { z } from 'zod';
 import type { RootState } from '../../app/store';
 
@@ -113,20 +114,7 @@ export type UpdateTicketResponse = z.infer<typeof UpdateTicketResponseSchema>;
 
 export const ticketsApi = createApi({
   reducerPath: 'ticketsApi',
-  baseQuery: fetchBaseQuery({
-    // Inject auth token from Redux store via prepareHeaders
-    prepareHeaders: (headers, { getState }) => {
-      const state = getState();
-      const accessToken = (state && typeof state === 'object' && 'auth' in state && typeof (state as { auth: { accessToken: string } }).auth.accessToken === 'string')
-        ? (state as { auth: { accessToken: string } }).auth.accessToken
-        : '';
-      if (accessToken) {
-        headers.set('Authorization', `Bearer ${accessToken}`);
-      }
-      return headers;
-    },
-    credentials: 'include',
-  }),
+  baseQuery: apiBaseQuery,
   tagTypes: ['Ticket', 'TicketList'],
   endpoints: (builder) => ({
     /** GET /tickets — list with optional filters */

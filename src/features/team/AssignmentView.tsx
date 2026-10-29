@@ -17,8 +17,7 @@
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams } from 'react-router-dom';
-import { selectSelectedAssignment, selectTeamError } from './api';
-import { clearSelectedAssignment } from './slice';
+import { clearSelectedAssignment, selectSelectedAssignment, selectTeamError } from './slice';
 
 const validationColors = {
   valid: 'var(--accent)',
