@@ -10,7 +10,6 @@
  */
 
 import { createSlice } from '@reduxjs/toolkit';
-import { z } from 'zod';
 import type { RootState, AppDispatch } from '../../app/store';
 import { authApi } from './api';
 

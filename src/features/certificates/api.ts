@@ -110,6 +110,8 @@ export const certificatesApi = createApi({
   endpoints: (builder) => ({
     /** GET /certificates — list issued certificates with optional filters */
     listCertificates: builder.query<CertificateListResponse, { userId?: string; labId?: string; status?: string } | void>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: CertificateListResponseSchema,
       query: (params) => ({
         url: '/certificates',
         method: 'GET',
@@ -121,28 +123,36 @@ export const certificatesApi = createApi({
       }),
       providesTags: (result) =>
         result
-          ? [...result.map(({ id }) => ({ type: 'Certificates', id })), { type: 'Certificates', id: 'LIST' }]
-          : [{ type: 'Certificates', id: 'LIST' }],
+          ? [...result.map(({ id }) => ({ type: 'Certificates' as const, id })), { type: 'Certificates' as const, id: 'LIST' }]
+          : [{ type: 'Certificates' as const, id: 'LIST' }],
     }),
 
     /** GET /certificates/:id — retrieve certificate details */
     getCertificate: builder.query<Certificate, string>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: CertificateSchema,
       query: (id) => `/certificates/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Certificates', id }],
     }),
 
     /** POST /certificates/issue — issue certificate for completed lab/ticket */
     issueCertificate: builder.mutation<IssueCertificateResponse, IssueCertificateRequest>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: IssueCertificateResponseSchema,
+      argSchema: IssueCertificateRequestSchema,
       query: (body) => ({
         url: '/certificates/issue',
         method: 'POST',
         body,
       }),
-      invalidatesTags: [{ type: 'Certificates', id: 'LIST' }],
+      invalidatesTags: [{ type: 'Certificates' as const, id: 'LIST' }],
     }),
 
     /** POST /certificates/validate — validate certificate hash (public endpoint) */
     validateCertificate: builder.mutation<ValidateCertificateResponse, ValidateCertificateRequest>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: ValidateCertificateResponseSchema,
+      argSchema: ValidateCertificateRequestSchema,
       query: (body) => ({
         url: '/certificates/validate',
         method: 'POST',

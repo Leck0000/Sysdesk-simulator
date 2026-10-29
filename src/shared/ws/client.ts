@@ -6,49 +6,11 @@
  */
 
 import type { UnknownAction } from '@reduxjs/toolkit';
-import type {
-  WSEnvelope,
-  ClientToServerPayload,
-  ClientAckPayload,
-  ServerToClientPayload,
-} from './envelope';
+import type { WSEnvelope, ClientToServerPayload, ServerToClientPayload } from './envelope';
 import { parseEnvelope, createEnvelope } from './envelope';
 
-import type {
-  WSActionType,
-  WSConnectPayload,
-  WSConnectedPayload,
-  WSDisconnectPayload,
-  WSReconnectingPayload,
-  WSSendPayload,
-  WSMessagePayload,
-  WSSendFailedPayload,
-  WSHeartbeatPayload,
-  WSAckPayload,
-  WSAckTimeoutPayload,
-  WSErrorPayload,
-} from './events';
 
-import {
-  wsConnect,
-  wsConnected,
-  wsDisconnect,
-  wsDisconnected,
-  wsReconnecting,
-  wsReconnectFailed,
-  wsSent,
-  wsMessage,
-  wsSendFailed,
-  wsHeartbeatSent,
-  wsHeartbeatReceived,
-  wsHeartbeatMissed,
-  wsAckSent,
-  wsAckReceived,
-  wsAckTimeout,
-  wsError,
-  ServerEventType,
-  ClientEventType,
-} from './events';
+import { wsConnected, wsDisconnected, wsReconnecting, wsReconnectFailed, wsSent, wsMessage, wsSendFailed, wsHeartbeatSent, wsHeartbeatReceived, wsHeartbeatMissed, wsAckSent, wsAckReceived, wsAckTimeout, wsError, ServerEventType, ClientEventType } from './events';
 
 /**
  * Configuration options for WSClient
@@ -227,7 +189,8 @@ export class WSClient extends EventEmitter {
     return new Promise((resolve, reject) => {
       try {
         // Use global WebSocket constructor
-        (this.ws = new WebSocket(url, this.config.protocols)), (this.ws.binaryType = 'arraybuffer');
+        this.ws = new WebSocket(url, this.config.protocols);
+        this.ws.binaryType = 'arraybuffer';
 
         this.ws.onopen = () => {
           this.isConnecting = false;
@@ -254,7 +217,7 @@ export class WSClient extends EventEmitter {
           }
         };
 
-        this.ws.onerror = (event: Event) => {
+        this.ws.onerror = () => {
           const error = new Error('WebSocket error');
           this.emit('error', error);
           if (this.isConnecting) {

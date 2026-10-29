@@ -17,21 +17,6 @@
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams } from 'react-router-dom';
-import { clearSelectedAssignment, selectSelectedAssignment, selectTeamError } from './slice';
-
-const validationColors = {
-  valid: 'var(--accent)',
-  warning: 'var(--fg)',
-  invalid: 'var(--border)',
-  unknown: 'var(--muted)',
-};
-
-const validationLabels: Record<string, string> = {
-  valid: 'Valid',
-  warning: 'Warning',
-  invalid: 'Invalid',
-  unknown: 'Unknown',
-};
 
 export const AssignmentView: React.FC = () => {
   const dispatch = useDispatch();
@@ -71,14 +56,6 @@ export const AssignmentView: React.FC = () => {
       </div>
     );
   }
-
-  // Machine state validation
-  const validateMachineState = (state: string) => {
-    const baseColor = validationColors.unknown;
-    const baseLabel = validationLabels.unknown;
-    // In a full implementation, this would check against rubric/validation rules
-    return { color: baseColor, label: baseLabel };
-  };
 
   return (
     <div className="space-y-4" style={{ minHeight: '500px' }}>

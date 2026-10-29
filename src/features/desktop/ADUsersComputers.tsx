@@ -10,14 +10,12 @@
  * Accessibility: WCAG 2.1 AA
  * Responsive: >=1280px desktop-first; sidebar collapses to drawer <1024px
  ****/
-import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import React from 'react';
+import { useSelector } from 'react-redux';
 import type { RootState } from '../../app/store';
 import { z } from 'zod';
+import { useSubsystemData } from './useSubsystemData';
 
-// Import ws actions and types
-import { wsSend, createSendCommand, ClientEventType } from '../../shared/ws';
-import { desktopSlice } from './slice';
 
 // AD User schema
 const AdUserSchema = z.object({
@@ -33,11 +31,6 @@ type AdUser = z.infer<typeof AdUserSchema>;
 
 const adUsersSchema = z.array(AdUserSchema);
 
-type AdState = {
-  users: AdUser[];
-  isFetching: boolean;
-  error: string | null;
-};
 
 /** ADUsersComputersProps — props for ADUsersComputers component */
 interface ADUsersComputersProps {
@@ -46,10 +39,6 @@ interface ADUsersComputersProps {
 
 /** ADUsersComputers — Active Directory simulated app window */
 const ADUsersComputers: React.FC<ADUsersComputersProps> = ({ windowId }) => {
-  const dispatch = useDispatch();
-  const { sessionId } = useSelector(
-    (state: RootState) => state.ws
-  );
   const machineId = useSelector(
     (state: RootState) => {
       const windows = state.desktop.windows;
@@ -57,38 +46,10 @@ const ADUsersComputers: React.FC<ADUsersComputersProps> = ({ windowId }) => {
       return desktopWindow?.machineId ?? windowId;
     }
   );
-  const [users, setUsers] = useState<AdUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Subscribe to state.delta events for AD subsystem
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data) as unknown;
-        if (data.t === 'state.delta' && data.payload?.subsystem === 'ad') {
-          const parsed = adUsersSchema.safeParse(data.payload?.value);
-          if (parsed.success) {
-            setUsers(parsed.data);
-          }
-        }
-      } catch {
-        // ignore parse errors
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [sessionId]);
-
-  // Send command to backend
-  const sendCommand = (command: string) => {
-    if (!sessionId) return;
-    const payload = createSendCommand(machineId, command);
-    dispatch(wsSend({ type: ClientEventType.SEND_COMMAND, payload }));
-  };
+  const subsystemData = useSubsystemData('ad', adUsersSchema);
+  const users: AdUser[] = subsystemData.data ?? [];
+  const isLoading = subsystemData.status === 'loading';
+  const error = subsystemData.error;
 
   if (isLoading) {
     return (
@@ -134,7 +95,6 @@ const ADUsersComputers: React.FC<ADUsersComputersProps> = ({ windowId }) => {
           userSelect: 'none',
           height: '28px',
           borderBottom: '1px solid var(--border)',
-          role: 'presentation',
         }}
         role='presentation'
       >
@@ -180,49 +140,4 @@ const ADUsersComputers: React.FC<ADUsersComputersProps> = ({ windowId }) => {
   );
 };
 
-/** LazyADUsersComputers — lazily loaded ADUsersComputers with code-splitting */
-const LazyADUsersComputers = React.lazy(() => import('./ADUsersComputers'));
-
-/** ADUsersComputersWindow — Window chrome + ADUsersComputers component */
-const ADUsersComputersWindow: React.FC<ADUsersComputersProps> = ({ windowId }) => {
-  return (
-    <div
-      data-testid="ad-users-computers-window"
-      style={{
-        backgroundColor: 'var(--card)',
-        color: 'var(--fg)',
-        border: '1px solid var(--border)',
-        borderRadius: '4px',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Title bar */}
-      <div
-        style={{
-          backgroundColor: 'var(--accent)',
-          color: 'var(--bg)',
-          padding: '8px 12px',
-          fontSize: '13px',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          userSelect: 'none',
-          height: '28px',
-          borderBottom: '1px solid var(--border)',
-          role: 'presentation',
-        }}
-        role='presentation'
-      >
-        <span style={{ flexGrow: 1 }}>Active Directory</span>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {/* Control buttons would go here */}
-        </div>
-      </div>
-
-      {/* AD content */}
-      <LazyADUsersComputers windowId={windowId} />
-    </div>
-  );
-};
-
-export { ADUsersComputers, ADUsersComputersWindow };
+export { ADUsersComputers };

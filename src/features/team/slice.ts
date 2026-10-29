@@ -9,8 +9,7 @@
 */
 
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
-import { z } from 'zod';
-import type { RootState, AppDispatch } from '../../app/store';
+import type { RootState } from '../../app/store';
 import { teamApi, type Assignment, type BulkImportResult, type CohortStudent, type LabProgress } from './api';
 
 /** Message from an RTK Query / thrown error, for rejectWithValue. */
@@ -19,13 +18,6 @@ const errorMessage = (err: unknown, fallback: string): string => {
   if (typeof err === 'object' && err !== null && 'error' in err && typeof err.error === 'string') return err.error;
   return fallback;
 };
-
-interface CohortProgress {
-  labId: string;
-  progress: number;
-  activeMachines: number;
-  timestamp: string;
-}
 
 const initialTeamState = {
   // Cohort roster — students in the current cohort

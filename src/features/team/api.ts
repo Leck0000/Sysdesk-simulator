@@ -74,6 +74,8 @@ export const teamApi = createApi({
   endpoints: (builder) => ({
     /** GET /team/cohort — fetch current cohort roster */
     cohortQuery: builder.query<CohortStudent[], void>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: z.array(CohortStudentSchema),
       query: () => ({
         url: '/team/cohort',
         method: 'GET',
@@ -83,6 +85,8 @@ export const teamApi = createApi({
 
     /** GET /team/assignments — fetch all assignments for a cohort */
     assignmentsQuery: builder.query<Assignment[], string>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: z.array(AssignmentSchema),
       query: (cohortId) => ({
         url: `/team/assignments?cohortId=${cohortId}`,
         method: 'GET',
@@ -92,6 +96,9 @@ export const teamApi = createApi({
 
     /** POST /team/assignments — create a new assignment */
     createAssignmentMutation: builder.mutation<Assignment, Assignment>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: AssignmentSchema,
+      argSchema: AssignmentSchema,
       query: (body) => ({
         url: '/team/assignments',
         method: 'POST',
@@ -102,6 +109,11 @@ export const teamApi = createApi({
 
     /** POST /team/bulk-import — CSV/Multipart upload for assignments */
     bulkImportMutation: builder.mutation<BulkImportResult, FormData>({
+      // Validate the server response (and args) at the boundary.
+      // Schema has defaults (input != output): validate the raw body (handled SchemaError on
+      // mismatch), then parse to apply defaults and get the output type.
+      rawResponseSchema: BulkImportResultSchema,
+      transformResponse: (raw: unknown) => BulkImportResultSchema.parse(raw),
       query: (body) => ({
         url: '/team/bulk-import',
         method: 'POST',
@@ -112,6 +124,8 @@ export const teamApi = createApi({
 
     /** Subscribe to lab_progress WS events for a lab */
     subscribeLabProgress: builder.query<LabProgress[], string>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: z.array(LabProgressSchema),
       query: (labId) => ({
         url: `/team/lab-progress?labId=${labId}`,
         method: 'GET',

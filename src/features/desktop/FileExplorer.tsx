@@ -10,14 +10,12 @@
  * Accessibility: WCAG 2.1 AA
  * Responsive: >=1280px desktop-first; sidebar collapses to drawer <1024px
  ****/
-import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import React from 'react';
+import { useSelector } from 'react-redux';
 import type { RootState } from '../../app/store';
 import { z } from 'zod';
+import { useSubsystemData } from './useSubsystemData';
 
-// Import ws actions and types
-import { wsSend, createSendCommand, ClientEventType } from '../../shared/ws';
-import { desktopSlice } from './slice';
 
 // Filesystem drive schema
 const FilesystemDriveSchema = z.object({
@@ -31,11 +29,6 @@ type FilesystemDrive = z.infer<typeof FilesystemDriveSchema>;
 
 const drivesSchema = z.array(FilesystemDriveSchema);
 
-type FSState = {
-  drives: FilesystemDrive[];
-  isFetching: boolean;
-  error: string | null;
-};
 
 /** FileExplorerProps — props for FileExplorer component */
 interface FileExplorerProps {
@@ -44,10 +37,6 @@ interface FileExplorerProps {
 
 /** FileExplorer — File Explorer simulated app window */
 const FileExplorer: React.FC<FileExplorerProps> = ({ windowId }) => {
-  const dispatch = useDispatch();
-  const { sessionId } = useSelector(
-    (state: RootState) => state.ws
-  );
   const machineId = useSelector(
     (state: RootState) => {
       const windows = state.desktop.windows;
@@ -55,38 +44,10 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ windowId }) => {
       return desktopWindow?.machineId ?? windowId;
     }
   );
-  const [drives, setDrives] = useState<FilesystemDrive[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Subscribe to state.delta events for Filesystem subsystem
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data) as unknown;
-        if (data.t === 'state.delta' && data.payload?.subsystem === 'filesystem') {
-          const parsed = drivesSchema.safeParse(data.payload?.value);
-          if (parsed.success) {
-            setDrives(parsed.data);
-          }
-        }
-      } catch {
-        // ignore parse errors
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [sessionId]);
-
-  // Send command to backend
-  const sendCommand = (command: string) => {
-    if (!sessionId) return;
-    const payload = createSendCommand(machineId, command);
-    dispatch(wsSend({ type: ClientEventType.SEND_COMMAND, payload }));
-  };
+  const subsystemData = useSubsystemData('filesystem', drivesSchema);
+  const drives: FilesystemDrive[] = subsystemData.data ?? [];
+  const isLoading = subsystemData.status === 'loading';
+  const error = subsystemData.error;
 
   if (isLoading) {
     return (
@@ -132,7 +93,6 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ windowId }) => {
           userSelect: 'none',
           height: '28px',
           borderBottom: '1px solid var(--border)',
-          role: 'presentation',
         }}
         role='presentation'
       >
@@ -178,49 +138,4 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ windowId }) => {
   );
 };
 
-/** LazyFileExplorer — lazily loaded FileExplorer with code-splitting */
-const LazyFileExplorer = React.lazy(() => import('./FileExplorer'));
-
-/** FileExplorerWindow — Window chrome + FileExplorer component */
-const FileExplorerWindow: React.FC<FileExplorerProps> = ({ windowId }) => {
-  return (
-    <div
-      data-testid="file-explorer-window"
-      style={{
-        backgroundColor: 'var(--card)',
-        color: 'var(--fg)',
-        border: '1px solid var(--border)',
-        borderRadius: '4px',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Title bar */}
-      <div
-        style={{
-          backgroundColor: 'var(--accent)',
-          color: 'var(--bg)',
-          padding: '8px 12px',
-          fontSize: '13px',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          userSelect: 'none',
-          height: '28px',
-          borderBottom: '1px solid var(--border)',
-          role: 'presentation',
-        }}
-        role='presentation'
-      >
-        <span style={{ flexGrow: 1 }}>File Explorer</span>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {/* Control buttons would go here */}
-        </div>
-      </div>
-
-      {/* File content */}
-      <LazyFileExplorer windowId={windowId} />
-    </div>
-  );
-};
-
-export { FileExplorer, FileExplorerWindow };
+export { FileExplorer };

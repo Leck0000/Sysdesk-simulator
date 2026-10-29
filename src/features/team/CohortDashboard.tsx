@@ -14,14 +14,9 @@
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Recharts } from 'recharts';
-import { clearTeamState, clearProgressStream } from './slice';
 
 // Student progress bar constants
-const BAR_HEIGHT = 8;
-const BAR_WIDTH = 120;
 const PROGRESS_COLOR = 'var(--accent)';
-const STALE_COLOR = 'var(--border)';
 
 interface StudentRowProps {
   student: CohortStudent;

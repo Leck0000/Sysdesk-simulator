@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { z } from 'zod';
 import { selectSelectedTicket } from '../tickets/slice';
 
@@ -70,7 +70,6 @@ interface RubricEditorProps {
 export const RubricEditor: React.FC<RubricEditorProps> = ({
   initialRubric,
 }) => {
-  const dispatch = useDispatch();
   const selectedTicket = useSelector(selectSelectedTicket);
 
   // Check instructor role — simplified check
@@ -105,7 +104,7 @@ export const RubricEditor: React.FC<RubricEditorProps> = ({
       const error = validateRubric(rubric);
       if (error) return;
       setIsSaving(false);
-    } catch (err) {
+    } catch {
       setEditorError('Failed to save rubric');
       setIsSaving(false);
     }
@@ -143,7 +142,7 @@ export const RubricEditor: React.FC<RubricEditorProps> = ({
     try {
       const parsed = RubricDslSchema.parse(JSON.parse(newContent));
       setRubric(parsed);
-    } catch (err) {
+    } catch {
       // Silently ignore invalid input while typing; validate on blur/save
     }
   };

@@ -14,8 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { selectThreadMessages, selectThreadStatus, selectThreadError } from './slice';
 import { selectSelectedTicket } from '../tickets/slice';
-import { selectUserRole } from '../auth/slice';
-import { addMessage, processRequesterMessage } from './slice';
+import { processRequesterMessage } from './slice';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
@@ -25,21 +24,18 @@ const MessageInputSchema = z.object({
   text: z.string().min(1).max(1000),
 });
 
-type MessageInput = z.infer<typeof MessageInputSchema>;
 
 interface ChatPanelProps {
   ticketId: string;
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({ ticketId }) => {
-  const role = useSelector(selectUserRole);
   const selectedTicket = useSelector(selectSelectedTicket);
   const messages = useSelector(selectThreadMessages(ticketId));
   const threadStatus = useSelector(selectThreadStatus(ticketId));
   const threadError = useSelector(selectThreadError(ticketId));
   
   const [inputValue, setInputValue] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
   
   // Scroll to bottom ref
   const bottomRef = useRef<HTMLDivElement>(null);

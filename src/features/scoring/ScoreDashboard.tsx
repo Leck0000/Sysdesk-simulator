@@ -11,25 +11,16 @@
  * Responsive: >=1280px desktop-first; collapses to drawer <1024px.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { z } from 'zod';
 import { subscribeToScoringUpdates, selectTicketForScoring } from './slice';
-import { selectFilteredQueue, selectSelectedTicket } from '../tickets/slice';
-import { selectIsSubscribed, selectAggregateScores, selectLastUpdated, selectFeedback, selectCriterionScores, selectSelectedTicketId as scoringSelectSelectedTicketId } from './slice';
+import { selectSelectedTicket } from '../tickets/slice';
+import { selectIsSubscribed, selectAggregateScores, selectLastUpdated, selectFeedback, selectSelectedTicketId as scoringSelectSelectedTicketId } from './slice';
 
 // ---------------------------------------------------------------------------
 // Zod schemas for boundary validation
 // ---------------------------------------------------------------------------
 
-const CriterionScoreSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string(),
-  score: z.number().int().min(0).max(100),
-  maxScore: z.number().int().min(0).max(100),
-});
-
-type CriterionScore = z.infer<typeof CriterionScoreSchema>;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -48,7 +39,7 @@ const ScoreBar: React.FC<ScoreBarProps> = ({ label, score, maxScore }) => {
   const ariaLabel = `${label} score: ${score} out of ${maxScore}`;
 
   return (
-    <div>
+    <div role="meter" aria-label={ariaLabel} aria-valuenow={score} aria-valuemin={0} aria-valuemax={maxScore}>
       <h3 className="sr-only">{label} score</h3>
       <div>
         <div
@@ -73,7 +64,6 @@ const ScoreBar: React.FC<ScoreBarProps> = ({ label, score, maxScore }) => {
 export const ScoreDashboard: React.FC = () => {
   const dispatch = useDispatch();
   // Selectors from scoring slice
-  const criterionScores = useSelector(selectCriterionScores);
   const { technical, process, communication } = useSelector(selectAggregateScores);
   const lastUpdated = useSelector(selectLastUpdated);
   const feedback = useSelector(selectFeedback);

@@ -11,11 +11,10 @@
  * Responsive: >=1280px desktop-first; sidebar collapses to drawer <1024px
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { selectThreadMessages, selectThreadStatus, selectThreadError } from './slice';
 import { selectSelectedTicket } from '../tickets/slice';
-import { selectUserRole } from '../auth/slice';
 
 // Email message schema for boundary validation
 const EmailMessageSchema = z.object({
@@ -27,14 +26,12 @@ const EmailMessageSchema = z.object({
   timestamp: z.string().datetime(),
 });
 
-type EmailMessage = z.infer<typeof EmailMessageSchema>;
 
 interface EmailThreadProps {
   ticketId: string;
 }
 
 const EmailThread: React.FC<EmailThreadProps> = ({ ticketId }) => {
-  const role = useSelector(selectUserRole);
   const messages = useSelector(selectThreadMessages(ticketId));
   const threadStatus = useSelector(selectThreadStatus(ticketId));
   const threadError = useSelector(selectThreadError(ticketId));
@@ -65,7 +62,7 @@ const EmailThread: React.FC<EmailThreadProps> = ({ ticketId }) => {
   const handleSend = () => {
     if (!validateInput()) return;
 
-    const emailMessage: EmailMessage = result.data;
+    // NOTE: sending is not implemented yet; the validated message is not dispatched.
 
     // Add message to thread state
     // In a real app, this would send via API and receive WS confirmation

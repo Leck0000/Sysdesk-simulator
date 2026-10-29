@@ -1,6 +1,6 @@
 import authReducer from '../auth/slice';
 import certificatesReducer from './slice';
-import { describe, it, expect } from 'vitest';
+import { describe, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -25,7 +25,7 @@ const store = configureStore({
 describe('VerificationPage', () => {
   beforeEach(() => {
     // Reset state before each test
-    store.dispatch(({ type }) => {
+    store.dispatch(() => {
       // No-op reset
     });
   });

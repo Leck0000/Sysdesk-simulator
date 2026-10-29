@@ -13,7 +13,7 @@ import { z } from 'zod';
 // Zod schemas for boundary validation (no `any` at boundaries)
 // ---------------------------------------------------------------------------
 
-const WindowSchema = z.object({
+export const WindowSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
   innerWidth: z.number().int().min(100),
@@ -33,14 +33,14 @@ export type DesktopWindow = z.infer<typeof WindowSchema>;
 /** Input shape (fields with schema defaults are optional). */
 export type DesktopWindowInput = z.input<typeof WindowSchema>;
 
-const ZOrderSchema = z.object({
+export const ZOrderSchema = z.object({
   windowId: z.string().uuid(),
   zIndex: z.number().int().min(0),
 });
 
 type ZOrder = z.infer<typeof ZOrderSchema>;
 
-const activeWindowIdSchema = z.string().uuid().optional();
+export const activeWindowIdSchema = z.string().uuid().optional();
 
 type ActiveWindowId = z.infer<typeof activeWindowIdSchema> | undefined;
 
@@ -59,6 +59,8 @@ export interface DesktopState {
   activeWindowId: ActiveWindowId;
   // Terminal output chunks per machine (from ws command_output), newest last
   terminalOutput: Record<string, string[]>;
+  // Latest value per simulated-OS subsystem (from ws state.delta)
+  subsystems: Record<string, unknown>;
 }
 
 /** Max output chunks retained per machine. */
@@ -73,6 +75,7 @@ const initialState: DesktopState = {
   zOrder: [],
   activeWindowId: undefined,
   terminalOutput: {},
+  subsystems: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -174,6 +177,13 @@ export const desktopSlice = createSlice({
       const chunks = (state.terminalOutput[machineId] ??= []);
       chunks.push(output);
       if (chunks.length > TERMINAL_OUTPUT_LIMIT) chunks.splice(0, chunks.length - TERMINAL_OUTPUT_LIMIT);
+    },
+
+    /** Apply a ws state.delta: set or delete a subsystem's value */
+    applyStateDelta: (state, action: PayloadAction<{ subsystem: string; op: 'set' | 'delete'; value?: unknown }>) => {
+      const { subsystem, op, value } = action.payload;
+      if (op === 'delete') delete state.subsystems[subsystem];
+      else state.subsystems[subsystem] = value;
     },
 
     /** Activate a window (set as active) */
@@ -285,6 +295,7 @@ export const {
   activateWindow,
   focusWindow,
   appendTerminalOutput,
+  applyStateDelta,
   minimizeWindow,
   maximizeWindow,
   restoreWindow,

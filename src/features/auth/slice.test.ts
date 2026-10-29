@@ -9,7 +9,7 @@
  * - No RTK Query dependencies in core reducer tests
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { authSlice } from './slice';
 
 // ---------------------------------------------------------------------------

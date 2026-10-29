@@ -10,24 +10,19 @@
  * Responsive: >=1280px desktop-first; sidebar collapses to drawer <1024px.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useListCertificatesQuery } from '../../features/certificates/api';
 import { z } from 'zod';
 import type { RootState } from '../../app/store';
-import {
-  setGalleryUserFilter,
-  setGalleryLabFilter,
-  setGalleryFilterStatus,
-  clearGalleryFilters,
-} from '../../features/certificates/slice';
+import { setGalleryUserFilter, clearGalleryFilters } from '../../features/certificates/slice';
 import { selectAuthUserId } from '../../features/auth/slice';
 
 // ---------------------------------------------------------------------------
 // Zod schema for gallery item validation (boundary — never pass raw data downstream)
 // ---------------------------------------------------------------------------
 
-const GalleryItemSchema = z.object({
+export const GalleryItemSchema = z.object({
   id: z.string().uuid(),
   userId: z.string().uuid(),
   labId: z.string().uuid(),
@@ -124,7 +119,6 @@ export const CertificateGallery: React.FC = () => {
     data,
     isLoading,
     isError,
-    error,
   } = useListCertificatesQuery(
     authUserId ? { userId: authUserId } : undefined,
     // Only fetch once we know who the user is.
@@ -189,9 +183,9 @@ export const CertificateGallery: React.FC = () => {
         <div className="alert" style={{ color: 'var(--accent)' }}>
           Loading certificates…
         </div>
-      ) : errorMsg ? (
+      ) : errorMsg || isError ? (
         <div className="alert alert-error" style={{ color: 'var(--fg)' }}>
-          {errorMsg}
+          {errorMsg ?? 'Could not load certificates.'}
         </div>
       ) : items.length === 0 ? (
         <p className="text-muted text-center">

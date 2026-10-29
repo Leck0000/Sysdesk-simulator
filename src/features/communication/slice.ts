@@ -11,7 +11,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { z } from 'zod';
 import type { RootState, AppDispatch } from '../../app/store';
-import { WSEnvelope, ServerEventType, RequesterMessagePayload, ScoringUpdatePayload } from '../../shared/ws/envelope';
 
 // ---------------------------------------------------------------------------
 // Zod schemas for WebSocket payload boundaries

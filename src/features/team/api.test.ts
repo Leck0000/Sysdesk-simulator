@@ -55,7 +55,16 @@ const waitForCalls = async (path: string, count: number) => {
 beforeEach(() => {
   vi.stubGlobal('Request', RelativeRequest);
   fetchMock = vi.fn((req: Request) =>
-    Promise.resolve(jsonResponse(req.method === 'GET' ? [] : assignment))
+    // Bodies match the API contract: responses are Zod-validated by the endpoints.
+    Promise.resolve(
+      jsonResponse(
+        req.method === 'GET'
+          ? []
+          : req.url.includes('/team/bulk-import')
+            ? { success: true, imported: 1, failed: 0, errors: [] }
+            : assignment
+      )
+    )
   );
   vi.stubGlobal('fetch', fetchMock);
 });

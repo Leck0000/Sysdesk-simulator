@@ -12,14 +12,12 @@ import { createSelector, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { z } from 'zod';
 import type { RootState, AppDispatch } from '../../app/store';
 import { ticketsApi } from './api';
-import { TicketPayloadSchema } from '../../shared/ws/envelope';
-import { ServerEventType } from '../../shared/ws/envelope';
 
 // ---------------------------------------------------------------------------
 // Zod schema for ticket update payload from WebSocket
 // ---------------------------------------------------------------------------
 
-const TicketUpdatePayloadSchema = z.object({
+export const TicketUpdatePayloadSchema = z.object({
   ticketId: z.string().uuid(),
   status: z.string(),
   assigneeId: z.string().uuid().optional(),
@@ -209,7 +207,7 @@ export const ticketsSlice = createSlice({
 
 /** Fetch tickets with current filters */
 export const fetchTickets = (params?: { queue?: Ticket['queue']; state?: Ticket['state']; priority?: Ticket['priority']; assignedToMe?: boolean }) =>
-  async (dispatch: AppDispatch, getState: () => RootState) => {
+  async (dispatch: AppDispatch) => {
     dispatch(ticketsSlice.actions.setStatus('loading'));
     try {
       const result = await dispatch(
@@ -223,26 +221,12 @@ export const fetchTickets = (params?: { queue?: Ticket['queue']; state?: Ticket[
 
 /** Claim a ticket for the current technician */
 export const claimTicket = (ticketId: string) => async (dispatch: AppDispatch) => {
-  try {
-    const result = await dispatch(
-      ticketsApi.endpoints.claimTicket.initiate({ ticketId })
-    ).unwrap();
-    // The queue will be updated via WebSocket ticket_update event
-    // But we can optimistically update here
-    dispatch(ticketsSlice.actions.updateTicketInQueue({ id: ticketId, state: 'in_progress' }));
-    return result;
-  } catch (error) {
-    throw error;
-  }
+  const result = await dispatch(ticketsApi.endpoints.claimTicket.initiate({ ticketId })).unwrap();
+  // The server confirms via a ticket_update WS event; update optimistically meanwhile.
+  dispatch(ticketsSlice.actions.updateTicketInQueue({ id: ticketId, state: 'in_progress' }));
+  return result;
 };
 
-/** Subscribe to WebSocket ticket updates — called on app init */
-export const subscribeToTicketUpdates = () => async (dispatch: AppDispatch, getState: () => RootState) => {
-  // The wsMiddleware handles WS messages and dispatches ws/message actions
-  // We listen for ticket_update events and merge them into the queue
-  // This is handled in the wsMiddleware listener, but we expose this thunk
-  // for the component to call on mount
-};
 
 // ---------------------------------------------------------------------------
 // Selectors

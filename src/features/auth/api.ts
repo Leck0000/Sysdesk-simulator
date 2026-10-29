@@ -79,6 +79,9 @@ export const authApi = createApi({
   endpoints: (builder) => ({
     /** POST /auth/login */
     loginMutation: builder.mutation<LoginResponse, LoginRequest>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: LoginResponseSchema,
+      argSchema: LoginRequestSchema,
       query: (body) => ({
         url: '/auth/login',
         method: 'POST',
@@ -89,6 +92,9 @@ export const authApi = createApi({
 
     /** POST /auth/refresh */
     refreshMutation: builder.mutation<RefreshResponse, RefreshRequest>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: RefreshResponseSchema,
+      argSchema: RefreshRequestSchema,
       query: (body) => ({
         url: '/auth/refresh',
         method: 'POST',
@@ -99,6 +105,9 @@ export const authApi = createApi({
 
     /** POST /auth/revoke */
     revokeMutation: builder.mutation<RevokeResponse, RevokeRequest>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: RevokeResponseSchema,
+      argSchema: RevokeRequestSchema,
       query: (body) => ({
         url: '/auth/revoke',
         method: 'POST',

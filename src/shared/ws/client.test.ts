@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { WSClient } from './client';
-import { WSEnvelope, parseEnvelope, createEnvelope } from './envelope';
+import { parseEnvelope, createEnvelope } from './envelope';
 import { ServerEventType, ClientEventType } from './events';
 import type { WSClientConfig } from './client';
 

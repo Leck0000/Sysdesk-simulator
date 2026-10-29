@@ -17,14 +17,6 @@ import { z } from 'zod';
 // Zod schemas (boundary validation — never pass raw network data downstream)
 // ---------------------------------------------------------------------------
 
-/** Scoring update payload from WebSocket — matches ARCHITECTURE.md §4.5 */
-const ScoringUpdateSchema = z.object({
-  ticketId: z.string().uuid(),
-  score: z.number().int().min(0).max(100),
-  feedback: z.string().optional(),
-  timestamp: z.string().datetime(),
-});
-
 /** Score summary payload */
 const ScoreSummarySchema = z.object({
   technical: z.number().int().min(0).max(100),
@@ -32,7 +24,6 @@ const ScoreSummarySchema = z.object({
   communication: z.number().int().min(0).max(100),
 });
 
-type ScoringUpdate = z.infer<typeof ScoringUpdateSchema>;
 type ScoreSummary = z.infer<typeof ScoreSummarySchema>;
 
 // ---------------------------------------------------------------------------
@@ -57,6 +48,8 @@ export const scoringApi = createApi({
 
     /** Get score summary for a ticket type */
     getScoreSummary: builder.query<ScoreSummary, string>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: ScoreSummarySchema,
       query: (ticketType) => ({
         url: `/score/${ticketType}`,
         method: 'GET',

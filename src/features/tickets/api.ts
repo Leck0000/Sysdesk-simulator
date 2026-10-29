@@ -39,7 +39,7 @@ const TicketSchema = z.object({
 });
 
 /** List tickets query params */
-const ListTicketsParamsSchema = z.object({
+export const ListTicketsParamsSchema = z.object({
   queue: z.enum(['AD', 'networking', 'security', 'helpdesk']).optional(),
   state: z.enum(['open', 'in_progress', 'on_hold', 'resolved', 'closed']).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
@@ -119,6 +119,11 @@ export const ticketsApi = createApi({
   endpoints: (builder) => ({
     /** GET /tickets — list with optional filters */
     listTickets: builder.query<ListTicketsResponse, ListTicketsParams | void>({
+      // Validate the server response (and args) at the boundary.
+      // Schema has defaults (input != output): validate the raw body (handled SchemaError on
+      // mismatch), then parse to apply defaults and get the output type.
+      rawResponseSchema: ListTicketsResponseSchema,
+      transformResponse: (raw: unknown) => ListTicketsResponseSchema.parse(raw),
       query: (params) => ({
         url: '/tickets',
         method: 'GET',
@@ -135,6 +140,11 @@ export const ticketsApi = createApi({
 
     /** GET /tickets/:id — get single ticket */
     getTicket: builder.query<TicketResponse, string>({
+      // Validate the server response (and args) at the boundary.
+      // Schema has defaults (input != output): validate the raw body (handled SchemaError on
+      // mismatch), then parse to apply defaults and get the output type.
+      rawResponseSchema: TicketResponseSchema,
+      transformResponse: (raw: unknown) => TicketResponseSchema.parse(raw),
       query: (id) => ({
         url: `/tickets/${id}`,
         method: 'GET',
@@ -144,6 +154,12 @@ export const ticketsApi = createApi({
 
     /** POST /tickets/:id/claim — claim ticket for current technician */
     claimTicket: builder.mutation<ClaimTicketResponse, ClaimTicketRequest>({
+      // Validate the server response (and args) at the boundary.
+      // Schema has defaults (input != output): validate the raw body (handled SchemaError on
+      // mismatch), then parse to apply defaults and get the output type.
+      rawResponseSchema: ClaimTicketResponseSchema,
+      transformResponse: (raw: unknown) => ClaimTicketResponseSchema.parse(raw),
+      argSchema: ClaimTicketRequestSchema,
       query: ({ ticketId }) => ({
         url: `/tickets/${ticketId}/claim`,
         method: 'POST',
@@ -156,6 +172,9 @@ export const ticketsApi = createApi({
 
     /** POST /tickets/:id/messages — add message to ticket */
     addMessage: builder.mutation<AddMessageResponse, AddMessageRequest>({
+      // Validate the server response (and args) at the boundary.
+      responseSchema: AddMessageResponseSchema,
+      argSchema: AddMessageRequestSchema,
       query: ({ ticketId, message }) => ({
         url: `/tickets/${ticketId}/messages`,
         method: 'POST',
@@ -166,6 +185,12 @@ export const ticketsApi = createApi({
 
     /** PATCH /tickets/:id — update ticket (state, priority, evidence, scoring) */
     updateTicket: builder.mutation<UpdateTicketResponse, UpdateTicketRequest>({
+      // Validate the server response (and args) at the boundary.
+      // Schema has defaults (input != output): validate the raw body (handled SchemaError on
+      // mismatch), then parse to apply defaults and get the output type.
+      rawResponseSchema: UpdateTicketResponseSchema,
+      transformResponse: (raw: unknown) => UpdateTicketResponseSchema.parse(raw),
+      argSchema: UpdateTicketRequestSchema,
       query: ({ ticketId, ...body }) => ({
         url: `/tickets/${ticketId}`,
         method: 'PATCH',
