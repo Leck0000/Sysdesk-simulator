@@ -92,4 +92,7 @@ export const refresh = () => async (dispatch: AppDispatch) => {
 // Expose the generated action creators for use in components
 export const { logout, setUser, resetStatus } = authSlice.actions;
 
+export const selectAuthUser = (state: RootState) => state.auth.user;
+export const selectAuthUserId = (state: RootState) => state.auth.user?.id ?? null;
+
 export default authSlice.reducer;

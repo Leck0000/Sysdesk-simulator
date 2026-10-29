@@ -44,10 +44,10 @@ export function TopBar() {
 
   return (
     <header
-      className="flex items-center justify-between p-4 border-b border-var(--border) bg-var(--card) flex-shrink-0"
+      className="flex items-center justify-between p-4 border-b border-border bg-card flex-shrink-0"
     >
       <div className="flex items-center gap-3">
-        <h2 className="text-xl font-semibold text-var(--fg)">
+        <h2 className="text-xl font-semibold text-fg">
           Ticket Queue
         </h2>
       </div>
@@ -68,23 +68,23 @@ export function TopBar() {
                 className="w-8 h-8 rounded-full object-cover"
                 loading="lazy"
               />
-              <span className="text-var(--muted) text-sm">{user.name}</span>
+              <span className="text-muted text-sm">{user.name}</span>
             </div>
             <div
-              className="absolute right-0 mt-2 w-24 rounded border-var(--border) bg-var(--card) p-2 shadow-md z-10 hidden focus:not-hidden"
+              className="absolute right-0 mt-2 w-24 rounded border-border bg-card p-2 shadow-md z-10 hidden focus:not-hidden"
               role="menu"
               aria-orientation="vertical"
             >
               {roles.includes('admin') && (
                 <button
-                  className="w-full text-left p-1 text-sm text-var(--fg) focus:outline-none focus:bg-var(--muted) rounded"
+                  className="w-full text-left p-1 text-sm text-fg focus:outline-none focus:bg-muted rounded"
                   aria-label="Admin settings"
                 >
                   Admin settings
                 </button>
               )}
               <button
-                className="w-full text-left text-sm text-var(--fg) hover:text-var(--muted) focus:outline-none focus:bg-var(--muted) rounded"
+                className="w-full text-left text-sm text-fg hover:text-muted focus:outline-none focus:bg-muted rounded"
                 onClick={() => dispatch(logout())}
                 aria-label="Logout"
               >
@@ -97,7 +97,7 @@ export function TopBar() {
         {/* Theme toggle */}
         <button
           onClick={toggleThemeHandler}
-          className="p-1 rounded hover:bg-var(--muted) transition-colors"
+          className="p-1 rounded hover:bg-muted transition-colors"
           aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
         >
           {theme === 'dark' ? '☀' : '🌙'}

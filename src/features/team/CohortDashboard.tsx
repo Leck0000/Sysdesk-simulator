@@ -46,15 +46,15 @@ const StudentRow: React.FC<StudentRowProps> = ({ student, onViewDetail }) => {
         {student.name.charAt(0)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-var(--fg) line-clamp-1" style={{ overflow: 'hidden' }}>
+        <p className="text-sm font-medium text-fg line-clamp-1" style={{ overflow: 'hidden' }}>
           {student.name}
         </p>
-        <p className="text-xs text-var(--muted) line-clamp-1" style={{ overflow: 'hidden' }}>
+        <p className="text-xs text-muted line-clamp-1" style={{ overflow: 'hidden' }}>
           {student.status}
         </p>
       </div>
       <div className="w-24">
-        <div className="h-2 rounded-full bg-var(--border) overflow-hidden">
+        <div className="h-2 rounded-full bg-border overflow-hidden">
           <div
             className="h-full rounded-bg"
             style={{ width: `${progress}%`, background: progress > 0 ? PROGRESS_COLOR : 'transparent' }}
@@ -64,7 +64,7 @@ const StudentRow: React.FC<StudentRowProps> = ({ student, onViewDetail }) => {
             aria-label={`Progress ${progress}%`}
           />
           {isStale && (
-            <span className="text-var(--muted) text-xs absolute left-1 top-1">stale</span>
+            <span className="text-muted text-xs absolute left-1 top-1">stale</span>
           )}
         </div>
       </div>
@@ -74,7 +74,7 @@ const StudentRow: React.FC<StudentRowProps> = ({ student, onViewDetail }) => {
 
 const ProgressHistogram: React.FC<{ data: Array<{ progress: number; status: string }> }> = ({ data }) => {
   if (!data.length) {
-    return <p className="text-var(--muted)">No progress data yet</p>;
+    return <p className="text-muted">No progress data yet</p>;
   }
 
   const bins = [0, 25, 50, 75, 100];
@@ -86,10 +86,10 @@ const ProgressHistogram: React.FC<{ data: Array<{ progress: number; status: stri
     <div className="space-y-1">
       {bins.map((bin, i) => (
         <div key={bin} className="flex items-center justify-between text-xs">
-          <span className="text-var(--muted)">{bin}+%</span>
+          <span className="text-muted">{bin}+%</span>
           <span>{counts[i] || 0} students</span>
           <div
-            className="flex h-1.5 rounded-full bg-var(--border) overflow-hidden w-24"
+            className="flex h-1.5 rounded-full bg-border overflow-hidden w-24"
             style={{ width: `${(counts[i] / Math.max(data.length, 1)) * 100}%` }}
           />
         </div>
@@ -110,7 +110,7 @@ const ProgressLineChart: React.FC<{ data: Array<{ progress: number; timestamp: s
       {sorted.map((entry, i) => (
         <div
           key={i}
-          className="flex-1 h-1.5 rounded-full bg-var(--border) overflow-hidden"
+          className="flex-1 h-1.5 rounded-full bg-border overflow-hidden"
           style={{ height: `${(entry.progress / 100) * 100}%`, background: PROGRESS_COLOR }}
         />
       ))}
@@ -171,7 +171,7 @@ export const CohortDashboard: React.FC = () => {
           ))}
         </div>
         {cohort.length === 0 && (
-          <p className="text-var(--muted) p-4 text-center">No students in cohort</p>
+          <p className="text-muted p-4 text-center">No students in cohort</p>
         )}
       </div>
 
@@ -185,7 +185,7 @@ export const CohortDashboard: React.FC = () => {
 
       {/* Real-time progress stream */}
       <div className="mt-3 p-3 rounded-md" style={{ background: 'var(--card)' }}>
-        <h4 className="text-sm font-medium text-var(--fg) mb-2">Progress Stream</h4>
+        <h4 className="text-sm font-medium text-fg mb-2">Progress Stream</h4>
         <div className="h-48 overflow-y-auto" style={{ background: 'var(--bg)' }}>
           {progressStream.map((entry, i) => (
             <div

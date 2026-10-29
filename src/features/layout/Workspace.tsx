@@ -1,64 +1,90 @@
 /**
- * Workspace component — main layout combining Sidebar and ticket content area
+ * Workspace — the main technician screen: TopBar, Sidebar (filters + tools),
+ * ticket list, ticket detail, and the desktop window layer on top.
  *
- * Consumes: ticketsSlice (queue state, selectedTicket), authSlice (user role),
- *            ticketsApi (RTK Query), wsMiddleware (WebSocket for real-time updates),
- *            TopBar (header component)
- * Produces: Workspace — React component with responsive sidebar/content/layout with TopBar
- *
- * Strict TS: no `any`; use `unknown` + zod parsers at boundaries.
- * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
- * Accessibility: WCAG 2.1 AA (focus-visible, aria-labels, skip-link)
- * Responsive: >=1280px desktop sidebar layout, drawer <1024px
+ * Consumes: ticketsSlice (queue, selection), wsSlice via TopBar, desktopSlice via WindowManager
+ * Strict TS: no `any`. Theming via Tailwind tokens mapped to CSS variables.
+ * Responsive: >=1024px fixed sidebar; below that the sidebar is a drawer.
  */
-import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { Sidebar } from './Sidebar';
-import { Toaster } from '../components/Toaster';
+import { useCallback, useEffect, useState } from 'react';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { isDemoMode, DEMO_TICKETS } from '../../app/demo';
+import { Toaster } from '../../shared/components/Toaster';
+import { wsConnect } from '../../shared/ws/events';
 import { TopBar } from './TopBar';
-import { TicketQueue } from '../tickets/TicketQueue';
+import { Sidebar } from './Sidebar';
+import { TicketCard } from '../tickets/TicketCard';
 import { TicketDetail } from '../tickets/TicketDetail';
-import { selectSelectedTicket, selectFilteredQueue } from '../tickets/slice';
-import { selectAuthUser } from '../../app/auth/slice';
+import { fetchTickets, selectFilteredQueue, selectSelectedTicket, selectTicket, setQueue } from '../tickets/slice';
+import { WindowManager } from '../desktop/WindowManager';
 
 export function Workspace() {
-  const dispatch = useDispatch();
-  const selectedTicket = useSelector(selectSelectedTicket);
-  const filteredQueue = useSelector(selectFilteredQueue);
-  const user = useSelector(selectAuthUser);
+  const dispatch = useAppDispatch();
+  const queue = useAppSelector(selectFilteredQueue);
+  const selected = useAppSelector(selectSelectedTicket);
+  const { status, error } = useAppSelector((state) => state.tickets);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
-  // If no ticket is selected but we have tickets in the queue,
-  // automatically select the first one
-  const autoSelectFirstTicket = () => {
-    if (!selectedTicket && filteredQueue.length > 0) {
-      dispatch({ type: 'tickets/selectTicket', payload: filteredQueue[0].id });
-    }
-  };
-
+  // Initial data: demo seed, or the tickets API + WebSocket when configured.
   useEffect(() => {
-    autoSelectFirstTicket();
-  }, [selectedTicket, filteredQueue.length]);
+    if (isDemoMode()) {
+      dispatch(setQueue(DEMO_TICKETS));
+      return;
+    }
+    void dispatch(fetchTickets());
+    const wsUrl = import.meta.env.VITE_WS_URL;
+    if (typeof wsUrl === 'string' && wsUrl) dispatch(wsConnect({ url: wsUrl }));
+  }, [dispatch]);
 
   return (
-    <div className="min-h-screen bg-var(--bg)">
+    <div className="flex h-screen flex-col bg-bg text-fg">
       <TopBar />
-      <div className="flex min-h-screen flex-col">
-        <Sidebar />
-        <main className="flex-1 p-4 md:p-6 overflow-x-auto">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Ticket Queue view (left sidebar area on desktop, full width on mobile) */}
-            <div className="w-full md:w-64 space-y-3">
-              <TicketQueue />
-            </div>
+      <div className="relative flex min-h-0 flex-1">
+        <Sidebar open={drawerOpen} onClose={closeDrawer} />
 
-            {/* Ticket detail view (main area) */}
-            <div className="w-full md:w-[calc(100%-64px)] space-y-6">
-              <TicketDetail />
+        <main id="main" className="relative flex min-w-0 flex-1">
+          <section aria-labelledby="queue-heading" className="flex w-80 shrink-0 flex-col border-r border-border">
+            <div className="flex items-center justify-between border-b border-border p-3">
+              <h2 id="queue-heading" className="text-sm font-semibold text-fg">
+                Ticket queue <span className="text-muted">({queue.length})</span>
+              </h2>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(true)}
+                className="rounded border border-border px-2 py-1 text-xs text-fg lg:hidden"
+                aria-label="Open filters and tools"
+                aria-expanded={drawerOpen}
+              >
+                ☰ Menu
+              </button>
             </div>
-          </div>
+            <ul className="flex-1 space-y-2 overflow-y-auto p-3" aria-label="Tickets">
+              {status === 'loading' && <li className="text-sm text-muted">Loading tickets…</li>}
+              {status !== 'loading' && error && (
+                <li role="alert" className="text-sm text-muted">
+                  Couldn&apos;t load tickets: {error}
+                </li>
+              )}
+              {status !== 'loading' && !error && queue.length === 0 && (
+                <li className="text-sm text-muted">No tickets match the current filters.</li>
+              )}
+              {queue.map((t) => (
+                <li key={t.id}>
+                  <TicketCard ticket={t} selected={t.id === selected?.id} onSelect={(id) => dispatch(selectTicket(id))} />
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section aria-label="Ticket detail" className="min-w-0 flex-1 overflow-y-auto">
+            <TicketDetail />
+          </section>
+
+          <WindowManager />
         </main>
-        <Toaster />
       </div>
+      <Toaster />
     </div>
   );
 }

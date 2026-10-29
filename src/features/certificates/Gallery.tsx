@@ -20,7 +20,7 @@ import {
   setGalleryFilterStatus,
   clearGalleryFilters,
 } from '../../features/certificates/slice';
-import { selectAuthUserId } from '../../features/auth/api';
+import { selectAuthUserId } from '../../features/auth/slice';
 
 // ---------------------------------------------------------------------------
 // Zod schema for gallery item validation (boundary — never pass raw data downstream)
@@ -67,11 +67,11 @@ const CertificateCard: React.FC<{ item: GalleryItem }> = ({ item }) => {
           {item.id.substring(0, 3).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium text-var(--fg) line-clamp-1"
+          <h3 className="text-sm font-medium text-fg line-clamp-1"
             style={{ overflow: 'hidden' }}>
             {item.earnedCriteria}
           </h3>
-          <p className="text-xs text-var(--muted) line-clamp-1"
+          <p className="text-xs text-muted line-clamp-1"
             style={{ overflow: 'hidden' }}>
             Lab: {item.labId.substring(0, 8)}… • Issued: {issuedAt.toLocaleDateString()}
           </p>
@@ -80,7 +80,7 @@ const CertificateCard: React.FC<{ item: GalleryItem }> = ({ item }) => {
       <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
         <a
           href={`/verify/${item.earnedCriteria}/${item.id}`}
-          className="text-var(--accent) underline group-hover:underline-offset-4"
+          className="text-accent underline group-hover:underline-offset-4"
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Verify certificate ${item.id}`}>
@@ -88,7 +88,7 @@ const CertificateCard: React.FC<{ item: GalleryItem }> = ({ item }) => {
         </a>
       </div>
       {isExpired && (
-        <p className="text-var(--muted) text-xs mt-1">
+        <p className="text-muted text-xs mt-1">
           <span role="status">Certificate expired</span>
         </p>
       )}
@@ -104,7 +104,7 @@ export const CertificateGallery: React.FC = () => {
   const dispatch = useDispatch();
 
   // Get authenticated user ID from auth slice
-  const authUserId = useSelector((state: any) => selectAuthUserId(state));
+  const authUserId = useSelector(selectAuthUserId);
 
   // Get gallery filters from certificates slice state
   const galleryUserFilter = useSelector(
@@ -172,13 +172,13 @@ export const CertificateGallery: React.FC = () => {
       aria-label="Certificate gallery"
     >
       <header className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold text-var(--fg)">
+        <h2 className="text-2xl font-bold text-fg">
           Certificate Gallery
         </h2>
         {authUserId && (
           <button
             onClick={() => dispatch(clearGalleryFilters())}
-            className="text-var(--muted) hover:text-var(--accent) transition-colors"
+            className="text-muted hover:text-accent transition-colors"
             aria-label="Clear all filters"
           >
             Clear filters
@@ -195,7 +195,7 @@ export const CertificateGallery: React.FC = () => {
           {errorMsg}
         </div>
       ) : items.length === 0 ? (
-        <p className="text-var(--muted) text-center">
+        <p className="text-muted text-center">
           No certificates found.
         </p>
       ) : (

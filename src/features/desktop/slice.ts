@@ -30,6 +30,8 @@ const WindowSchema = z.object({
 });
 
 export type DesktopWindow = z.infer<typeof WindowSchema>;
+/** Input shape (fields with schema defaults are optional). */
+export type DesktopWindowInput = z.input<typeof WindowSchema>;
 
 const ZOrderSchema = z.object({
   windowId: z.string().uuid(),
@@ -46,7 +48,7 @@ type ActiveWindowId = z.infer<typeof activeWindowIdSchema> | undefined;
 // Types matching ARCHITECTURE.md data model patterns
 // ---------------------------------------------------------------------------
 
-export enum AppType { EventViewer = 'event-viewer', ServicesPanel = 'services-panel', RegistryEditor = 'registry-editor', NetworkPanel = 'network-panel', ADUsersComputers = 'ad-users-computers', FileExplorer = 'file-explorer' }
+export enum AppType { EventViewer = 'event-viewer', ServicesPanel = 'services-panel', RegistryEditor = 'registry-editor', NetworkPanel = 'network-panel', ADUsersComputers = 'ad-users-computers', FileExplorer = 'file-explorer', Terminal = 'terminal' }
 
 export interface DesktopState {
   // Window list
@@ -76,7 +78,7 @@ export const desktopSlice = createSlice({
   initialState,
   reducers: {
     /** Add a new window to the desktop */
-    addWindow: (state, action: PayloadAction<Omit<DesktopWindow, 'id'>>) => {
+    addWindow: (state, action: PayloadAction<Omit<DesktopWindowInput, 'id'>>) => {
       const newWindow = {
         id: crypto.randomUUID(),
         title: action.payload.title,
@@ -118,9 +120,9 @@ export const desktopSlice = createSlice({
       }
       // Update zIndex if provided
       if (zIndex !== undefined) {
-        const zIdx = state.zOrder.findIndex((z) => z.windowId === id);
-        if (zIdx !== -1) {
-          state.zOrder[zIdx].zIndex = zIndex;
+        const entry = state.zOrder.find((z) => z.windowId === id);
+        if (entry) {
+          entry.zIndex = zIndex;
         } else {
           state.zOrder.push({ windowId: id, zIndex });
         }
@@ -146,6 +148,18 @@ export const desktopSlice = createSlice({
           state.zOrder.push({ windowId, zIndex: state.zOrder.length });
         }
       }
+    },
+
+    /** Focus a window: make it active and raise it above all others */
+    focusWindow: (state, action: PayloadAction<string>) => {
+      const top = state.zOrder.reduce((max, z) => Math.max(max, z.zIndex), 0);
+      const entry = state.zOrder.find((z) => z.windowId === action.payload);
+      if (entry) {
+        if (entry.zIndex < top || state.zOrder.filter((z) => z.zIndex === top).length > 1) entry.zIndex = top + 1;
+      } else {
+        state.zOrder.push({ windowId: action.payload, zIndex: top + 1 });
+      }
+      state.activeWindowId = action.payload;
     },
 
     /** Activate a window (set as active) */
@@ -224,10 +238,10 @@ export const desktopSlice = createSlice({
       const newWindow = {
         id: crypto.randomUUID(),
         title,
-        innerWidth: 800,
-        innerHeight: 600,
-        x: 100,
-        y: 100,
+        innerWidth: 720,
+        innerHeight: 460,
+        x: 80 + (state.windows.length % 8) * 32,
+        y: 40 + (state.windows.length % 8) * 32,
         state: 'normal' as const,
         resizable: true,
         draggable: true,
@@ -255,6 +269,7 @@ export const {
   updateWindow,
   setZOrder,
   activateWindow,
+  focusWindow,
   minimizeWindow,
   maximizeWindow,
   restoreWindow,

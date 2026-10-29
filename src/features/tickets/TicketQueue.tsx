@@ -53,23 +53,23 @@ export function TicketQueue() {
   };
 
   return (
-    <div className="min-h-screen bg-var(--bg)">
+    <div className="min-h-screen bg-bg">
       {/* Sidebar */}
       <aside
-        className="sidebar w-64 md:static md:w-auto bg-var(--card) border-r border-var(--border) flex flex-col h-full"
+        className="sidebar w-64 md:static md:w-auto bg-card border-r border-border flex flex-col h-full"
       >
-        <div className="p-4 border-b border-var(--border)">
-          <h2 className="text-lg font-semibold text-var(--fg)">Ticket Queue</h2>
+        <div className="p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-fg">Ticket Queue</h2>
         </div>
 
         {/* Filters section */}
         <div className="p-3 flex-1 overflow-y-auto">
           {/* Queue filter */}
           <div className="mb-3">
-            <label className="block text-sm text-var(--muted) mb-1">Queue</label>
+            <label className="block text-sm text-muted mb-1">Queue</label>
             <select
               onChange={(e) => dispatch(setFilters({ queue: e.target.value as any }))}
-              className="w-full rounded border border-var(--border) bg-var(--card) p-2 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
+              className="w-full rounded border border-border bg-card p-2 text-fg focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
               aria-label="Filter tickets by queue"
             >
               <option value="">All queues</option>
@@ -82,10 +82,10 @@ export function TicketQueue() {
 
           {/* State filter */}
           <div className="mb-3">
-            <label className="block text-sm text-var(--muted) mb-1">State</label>
+            <label className="block text-sm text-muted mb-1">State</label>
             <select
               onChange={(e) => dispatch(setFilters({ state: e.target.value as any }))}
-              className="w-full rounded border border-var(--border) bg-var(--card) p-2 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
+              className="w-full rounded border border-border bg-card p-2 text-fg focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
               aria-label="Filter tickets by state"
             >
               <option value="">All states</option>
@@ -99,10 +99,10 @@ export function TicketQueue() {
 
           {/* Priority filter */}
           <div className="mb-3">
-            <label className="block text-sm text-var(--muted) mb-1">Priority</label>
+            <label className="block text-sm text-muted mb-1">Priority</label>
             <select
               onChange={(e) => dispatch(setFilters({ priority: e.target.value as any }))}
-              className="w-full rounded border border-var(--border) bg-var(--card) p-2 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
+              className="w-full rounded border border-border bg-card p-2 text-fg focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
               aria-label="Filter tickets by priority"
             >
               <option value="">All priorities</option>
@@ -115,7 +115,7 @@ export function TicketQueue() {
 
           {/* Assigned to me toggle */}
           <div className="mb-3">
-            <label className="flex items-center text-sm text-var(--muted) cursor-pointer">
+            <label className="flex items-center text-sm text-muted cursor-pointer">
               <input
                 type="checkbox"
                 onChange={(e) =>
@@ -124,7 +124,7 @@ export function TicketQueue() {
                       assignedToMe: e.target.checked,
                     })
                   )}
-                className="rounded border border-var(--border) bg-var(--card) p-1 focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
+                className="rounded border border-border bg-card p-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
                 aria-label="Show only tickets assigned to me"
               />
               Assigned to me
@@ -133,10 +133,10 @@ export function TicketQueue() {
 
           {/* Sort options */}
           <div className="mb-3">
-            <label className="block text-sm text-var(--muted) mb-1">Sort by</label>
+            <label className="block text-sm text-muted mb-1">Sort by</label>
             <select
               onChange={(e) => dispatch(setFilters({ sortBy: e.target.value as any }))}
-              className="w-full rounded border border-var(--border) bg-var(--card) p-2 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
+              className="w-full rounded border border-border bg-card p-2 text-fg focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
               aria-label="Sort tickets"
             >
               <option value="priority">Priority</option>
@@ -147,12 +147,12 @@ export function TicketQueue() {
 
           {/* View mode toggle */}
           <div className="mb-3">
-            <label className="flex items-center text-sm text-var(--muted) cursor-pointer">
+            <label className="flex items-center text-sm text-muted cursor-pointer">
               <input
                 type="radio"
                 checked={false}
                 onChange={() => {}}
-                className="rounded border border-var(--border) bg-var(--card) p-1 focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2 mr-2"
+                className="rounded border border-border bg-card p-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 mr-2"
                 aria-label="List view"
               />
               <span>List</span>
@@ -160,14 +160,14 @@ export function TicketQueue() {
                 type="radio"
                 checked={false}
                 onChange={() => {}}
-                className="rounded border border-var(--border) bg-var(--card) p-1 focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
+                className="rounded border border-border bg-card p-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
                 aria-label="Card view"
               />
               <span>Card</span>
             </label>
             <button
               onClick={handleClearFilters}
-              className="ml-2 text-var(--muted) text-sm underline hover:text-var(--accent)"
+              className="ml-2 text-muted text-sm underline hover:text-accent"
               aria-label="Clear all filters"
             >
               Clear
@@ -176,8 +176,8 @@ export function TicketQueue() {
         </div>
 
         {/* Queue stats */}
-        <div className="p-3 border-t border-var(--border) flex-1 flex flex-col justify-end">
-          <div className="flex items-center gap-2 text-sm text-var(--muted)">
+        <div className="p-3 border-t border-border flex-1 flex flex-col justify-end">
+          <div className="flex items-center gap-2 text-sm text-muted">
             <span>{queueCounts.open || 0} Open</span>
             <span>{queueCounts.in_progress || 0} In Progress</span>
             <span>{queueCounts.on_hold || 0} On Hold</span>
@@ -185,8 +185,8 @@ export function TicketQueue() {
             <span>{queueCounts.closed || 0} Closed</span>
           </div>
           <div className="mt-2">
-            <span className="text-var(--accent) font-medium">{priorityCounts.critical || 0} Critical</span>
-            <span className="text-var(--muted) mx-1">|</span>
+            <span className="text-accent font-medium">{priorityCounts.critical || 0} Critical</span>
+            <span className="text-muted mx-1">|</span>
             <span>{priorityCounts.high || 0} High</span>
           </div>
         </div>
@@ -199,7 +199,7 @@ export function TicketQueue() {
           {/* Ticket list/card grid */}
           <div className="flex-1 space-y-3">
             {filteredQueue.length === 0 && (
-              <p className="text-var(--muted) text-center py-8">
+              <p className="text-muted text-center py-8">
                 No tickets match the current filters.
               </p>
             )}
@@ -210,7 +210,7 @@ export function TicketQueue() {
 
             {/* Empty state when tickets exist but filtered out */}
             {filteredQueue.length === 0 && selectedTicket === null && (
-              <p className="text-var(--muted) text-center py-8">
+              <p className="text-muted text-center py-8">
                 No tickets in the queue.
               </p>
             )}
@@ -219,42 +219,42 @@ export function TicketQueue() {
           {/* Ticket detail panel (when a ticket is selected) */}
           {selectedTicket && (
             <div
-              className="w-full md:w-80 bg-var(--card) border border-var(--border) rounded-lg p-4 flex flex-col min-h-max"
+              className="w-full md:w-80 bg-card border border-border rounded-lg p-4 flex flex-col min-h-max"
             >
-              <h3 className="text-lg font-semibold text-var(--fg) mb-3">Ticket Detail</h3>
+              <h3 className="text-lg font-semibold text-fg mb-3">Ticket Detail</h3>
 
               <div className="flex items-start justify-between mb-3">
-                <span className="text-var(--muted) text-sm">#{selectedTicket.id}</span>
-                <span className="px-2 py-0.5 rounded text-xs font-medium text-var(--accent) text-var(--card)">
+                <span className="text-muted text-sm">#{selectedTicket.id}</span>
+                <span className="px-2 py-0.5 rounded text-xs font-medium text-accent text-card">
                   Critical
                 </span>
               </div>
 
-              <p className="text-var(--muted) text-sm mb-3 line-clamp-2">
+              <p className="text-muted text-sm mb-3 line-clamp-2">
                 Queue: {selectedTicket.queue}
               </p>
 
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <span className="block text-var(--muted) mb-1">State</span>
+                  <span className="block text-muted mb-1">State</span>
                   <span className="font-medium">{selectedTicket.state}</span>
                 </div>
                 <div>
-                  <span className="block text-var(--muted) mb-1">Assignee</span>
+                  <span className="block text-muted mb-1">Assignee</span>
                   <span className={selectedTicket.assignedTechnicianId
-                    ? 'text-var(--fg)'
-                    : 'text-var(--muted) opacity-80'}>
+                    ? 'text-fg'
+                    : 'text-muted opacity-80'}>
                     {selectedTicket.assignedTechnicianId || 'Unassigned'}
                   </span>
                 </div>
                 <div>
-                  <span className="block text-var(--muted) mb-1">Created</span>
+                  <span className="block text-muted mb-1">Created</span>
                   <span className="font-medium">
                     {new Date(selectedTicket.createdAt).toLocaleDateString()}
                   </span>
                 </div>
                 <div>
-                  <span className="block text-var(--muted) mb-1">Evidence</span>
+                  <span className="block text-muted mb-1">Evidence</span>
                   <span className="font-medium">
                     {selectedTicket.evidence.length} items
                   </span>
@@ -263,7 +263,7 @@ export function TicketQueue() {
 
               <button
                 onClick={async () => dispatch(claimTicket(selectedTicket.id))}
-                className="mt-4 w-full py-2 rounded border border-var(--accent) bg-var(--accent) text-var(--card) font-medium hover:opacity-90 transition-opacity"
+                className="mt-4 w-full py-2 rounded border border-accent bg-accent text-card font-medium hover:opacity-90 transition-opacity"
                 aria-label={`Claim ticket ${selectedTicket.id}`}
               >
                 Claim Ticket

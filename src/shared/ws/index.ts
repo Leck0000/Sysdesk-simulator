@@ -3,7 +3,8 @@
  * All WebSocket messages go through wsMiddleware (single source of truth).
  * Based on ARCHITECTURE.md section 4.5 WebSocket Event Schema.
  */
-export { wsSend, wsSent, createSendCommand, ClientEventType, isClientEventType } from './events';
+export { wsSend, wsSent, createSendCommand, ClientEventType } from './events';
+export { isClientEventType } from './envelope';
 export { wsConnect, wsConnected, wsDisconnect, wsDisconnected } from './events';
 export { wsSendFailed, wsMessage, wsHeartbeatSent, wsHeartbeatReceived } from './events';
 export { wsAckSent, wsAckReceived, wsAckTimeout, wsError } from './events';

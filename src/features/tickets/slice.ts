@@ -8,7 +8,7 @@
  * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
  */
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSelector, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { z } from 'zod';
 import type { RootState, AppDispatch } from '../../app/store';
 import { ticketsApi } from './api';
@@ -248,47 +248,37 @@ export const subscribeToTicketUpdates = () => async (dispatch: AppDispatch, getS
 // Selectors
 // ---------------------------------------------------------------------------
 
-/** Get filtered and sorted queue */
-export const selectFilteredQueue = (state: RootState): Ticket[] => {
-  const { queue, filters, sortBy, sortOrder } = state.tickets;
+const selectQueue = (state: RootState) => state.tickets.queue;
+const selectFilters = (state: RootState) => state.tickets.filters;
+const selectSortBy = (state: RootState) => state.tickets.sortBy;
+const selectSortOrder = (state: RootState) => state.tickets.sortOrder;
+const selectCurrentUserId = (state: RootState) => state.auth.user?.id;
 
-  let filtered = queue;
-
-  if (filters.queue) {
-    filtered = filtered.filter((t) => t.queue === filters.queue);
+/** Get filtered and sorted queue (memoized; never mutates store state) */
+export const selectFilteredQueue = createSelector(
+  [selectQueue, selectFilters, selectSortBy, selectSortOrder, selectCurrentUserId],
+  (queue, filters, sortBy, sortOrder, userId): Ticket[] => {
+    const filtered = queue.filter(
+      (t) =>
+        (!filters.queue || t.queue === filters.queue) &&
+        (!filters.state || t.state === filters.state) &&
+        (!filters.priority || t.priority === filters.priority) &&
+        (!filters.assignedToMe || !userId || t.assignedTechnicianId === userId)
+    );
+    // Ascending comparison; 'desc' (default) puts critical / newest first.
+    const compare = (a: Ticket, b: Ticket): number => {
+      switch (sortBy) {
+        case 'priority':
+          return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+        case 'createdAt':
+          return Date.parse(a.createdAt) - Date.parse(b.createdAt);
+        case 'updatedAt':
+          return Date.parse(a.updatedAt) - Date.parse(b.updatedAt);
+      }
+    };
+    return filtered.sort((a, b) => (sortOrder === 'asc' ? compare(a, b) : compare(b, a)));
   }
-  if (filters.state) {
-    filtered = filtered.filter((t) => t.state === filters.state);
-  }
-  if (filters.priority) {
-    filtered = filtered.filter((t) => t.priority === filters.priority);
-  }
-  if (filters.assignedToMe) {
-    const userId = state.auth.user?.id;
-    if (userId) {
-      filtered = filtered.filter((t) => t.assignedTechnicianId === userId);
-    }
-  }
-
-  // Sort
-  filtered.sort((a, b) => {
-    let comparison = 0;
-    switch (sortBy) {
-      case 'priority':
-        comparison = PRIORITY_ORDER[b.priority] - PRIORITY_ORDER[a.priority];
-        break;
-      case 'createdAt':
-        comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        break;
-      case 'updatedAt':
-        comparison = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-        break;
-    }
-    return sortOrder === 'asc' ? comparison : -comparison;
-  });
-
-  return filtered;
-};
+);
 
 /** Get selected ticket */
 export const selectSelectedTicket = (state: RootState): Ticket | null => {
@@ -297,48 +287,26 @@ export const selectSelectedTicket = (state: RootState): Ticket | null => {
   return queue.find((t) => t.id === selectedTicketId) ?? null;
 };
 
-/** Get queue count by state */
-export const selectQueueCounts = (state: RootState): Record<Ticket['state'], number> => {
-  const counts: Record<Ticket['state'], number> = {
-    open: 0,
-    in_progress: 0,
-    on_hold: 0,
-    resolved: 0,
-    closed: 0,
-  };
-  state.tickets.queue.forEach((t) => {
-    counts[t.state] += 1;
-  });
+const countBy = <K extends string>(queue: Ticket[], keys: readonly K[], key: (t: Ticket) => K): Record<K, number> => {
+  const counts = Object.fromEntries(keys.map((k) => [k, 0])) as Record<K, number>;
+  for (const t of queue) counts[key(t)] += 1;
   return counts;
 };
+
+/** Get queue count by state */
+export const selectQueueCounts = createSelector([selectQueue], (queue) =>
+  countBy(queue, ['open', 'in_progress', 'on_hold', 'resolved', 'closed'] as const, (t) => t.state)
+);
 
 /** Get queue count by priority */
-export const selectPriorityCounts = (state: RootState): Record<Ticket['priority'], number> => {
-  const counts: Record<Ticket['priority'], number> = {
-    critical: 0,
-    high: 0,
-    medium: 0,
-    low: 0,
-  };
-  state.tickets.queue.forEach((t) => {
-    counts[t.priority] += 1;
-  });
-  return counts;
-};
+export const selectPriorityCounts = createSelector([selectQueue], (queue) =>
+  countBy(queue, ['critical', 'high', 'medium', 'low'] as const, (t) => t.priority)
+);
 
 /** Get queue count by queue */
-export const selectQueueTypeCounts = (state: RootState): Record<Ticket['queue'], number> => {
-  const counts: Record<Ticket['queue'], number> = {
-    AD: 0,
-    networking: 0,
-    security: 0,
-    helpdesk: 0,
-  };
-  state.tickets.queue.forEach((t) => {
-    counts[t.queue] += 1;
-  });
-  return counts;
-};
+export const selectQueueTypeCounts = createSelector([selectQueue], (queue) =>
+  countBy(queue, ['AD', 'networking', 'security', 'helpdesk'] as const, (t) => t.queue)
+);
 
 // ---------------------------------------------------------------------------
 // Action exports

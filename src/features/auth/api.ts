@@ -10,6 +10,7 @@
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { z } from 'zod';
+import type { RootState } from '../../app/store';
 
 // ---------------------------------------------------------------------------
 // Zod schemas (boundary validation — never pass raw network data downstream)
@@ -144,23 +145,15 @@ export const revokeMutationThunk = authApi.endpoints.revokeMutation.initiate;
 // selectors that check the running query state.
 // ---------------------------------------------------------------------------
 
-// Helper to check if login mutation is currently loading
-export const selectIsLoggingIn = (state: any) => {
-  const running = authApi.util.selectors.getRunningQueriesMap(state)[authApi.endpoints.loginMutation.selector];
-  return !!(running?.pending !== undefined);
-};
+/** Raw RTK Query cache for the auth API. */
+export const selectAuthApiState = (state: RootState) => state.authApi;
 
-// Helper to check if refresh mutation is currently loading
-export const selectIsRefreshing = (state: any) => {
-  const running = authApi.util.selectors.getRunningQueriesMap(state)[authApi.endpoints.refreshMutation.selector];
-  return !!(running?.pending !== undefined);
-};
+const isMutationPending = (state: RootState, endpointName: string): boolean =>
+  Object.values(state.authApi.mutations).some((m) => m?.endpointName === endpointName && m.status === 'pending');
 
-// Helper to check if revoke mutation is currently loading
-export const selectIsRevooking = (state: any) => {
-  const running = authApi.util.selectors.getRunningQueriesMap(state)[authApi.endpoints.revokeMutation.selector];
-  return !!(running?.pending !== undefined);
-};
+export const selectIsLoggingIn = (state: RootState) => isMutationPending(state, 'loginMutation');
+export const selectIsRefreshing = (state: RootState) => isMutationPending(state, 'refreshMutation');
+export const selectIsRevoking = (state: RootState) => isMutationPending(state, 'revokeMutation');
 
 // ---------------------------------------------------------------------------
 // NOTE: RTK Query loading state for mutations is accessed via the selectors

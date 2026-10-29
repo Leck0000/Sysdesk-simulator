@@ -1,144 +1,156 @@
 /**
- * TicketDetail component — detailed view of a single ticket
+ * TicketDetail — the selected ticket: summary, actions and message thread.
  *
- * Consumes: ticketsApi (for ticket data), ticketsSlice (selectedTicket, queue state),
- *            authSlice (role-based permissions), wsMiddleware (for real-time updates)
- * Produces: TicketDetail — React component with ticket details, messages, and actions
- *
- * Strict TS: no `any`; use `unknown` + zod parsers at boundaries.
- * CSS variables for theming: --fg, --bg, --accent, --border, --card — no hardcoded colors.
- * Accessibility: WCAG 2.1 AA (focus-visible, aria-labels, color contrast via theme vars)
- * Responsive: full-width on mobile,sidebar-side on desktop
+ * Consumes: ticketsSlice (selected ticket), ticketsApi (addMessage), claimTicket thunk,
+ *           desktopSlice (open a terminal on the ticket's machine)
+ * Strict TS: no `any`. Theming via Tailwind tokens mapped to CSS variables.
+ * Accessibility: labelled form controls; status changes announced via role="status".
  */
+import React, { useEffect, useState } from 'react';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { selectSelectedTicket, claimTicket } from './slice';
+import { useAddMessageMutation } from './api';
+import { openAppWindow } from '../desktop/slice';
+import { DEFAULT_MACHINE_ID } from '../desktop/WindowsAppsLauncher';
 
-import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useState, useEffect } from 'react';
-import { selectSelectedTicket, selectFilteredQueue } from './slice';
-import { useParams } from 'react-router-dom';
-import { addNewMessage } from './api';
+interface LocalMessage {
+  text: string;
+  status: 'sending' | 'sent' | 'failed';
+}
 
 export function TicketDetail() {
-  const dispatch = useDispatch();
-  const { ticketId } = useParams<{ ticketId: string }>();
-  const selectedTicket = useSelector(selectSelectedTicket);
-  const filteredQueue = useSelector(selectFilteredQueue);
-  const user = useSelector((state: { auth: { user: any } }) => state.auth.user);
+  const dispatch = useAppDispatch();
+  const ticket = useAppSelector(selectSelectedTicket);
+  const [addMessage] = useAddMessageMutation();
+  const [draft, setDraft] = useState('');
+  const [messages, setMessages] = useState<LocalMessage[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  // Find the selected ticket from the queue or params
-  const ticket = filteredQueue.find((t) => t.id === ticketId) || selectedTicket || null;
-
-  const [messages, setMessages] = useState<string[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-
-  // Load messages when ticket changes
   useEffect(() => {
-    if (ticket) {
-      setMessages([]);
-    }
-  }, [ticket]);
-
-  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setNewMessage(e.target.value);
-  };
-
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !ticket) return;
-    dispatch(
-      addNewMessage({ ticketId: ticket.id, message: newMessage })
-    );
-    setMessages((prev) => [...prev, newMessage]);
-    setNewMessage('');
-  };
+    setMessages([]);
+    setDraft('');
+    setNotice(null);
+  }, [ticket?.id]);
 
   if (!ticket) {
     return (
-      <div className="p-8 text-var(--muted) text-center">
-        <p>Ticket not found</p>
+      <div data-testid="ticket-detail-empty" className="flex h-full items-center justify-center p-8 text-muted">
+        Select a ticket to see its details.
       </div>
     );
   }
 
+  const machineId = ticket.relatedMachineId ?? DEFAULT_MACHINE_ID;
+
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = draft.trim();
+    if (!text) return;
+    setDraft('');
+    const index = messages.length;
+    setMessages((prev) => [...prev, { text, status: 'sending' }]);
+    const result = await addMessage({ ticketId: ticket.id, message: text });
+    setMessages((prev) =>
+      prev.map((m, i) => (i === index ? { ...m, status: 'error' in result ? 'failed' : 'sent' } : m))
+    );
+  };
+
+  const claim = async () => {
+    try {
+      await dispatch(claimTicket(ticket.id));
+      setNotice('Ticket claimed.');
+    } catch (err) {
+      setNotice(`Claim failed: ${err instanceof Error ? err.message : 'server unavailable'}`);
+    }
+  };
+
   return (
-    <div className="bg-var(--bg) min-h-screen">
-      <header className="p-4 border-b border-var(--border) flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-var(--fg)">
-          Ticket #{ticket.id}
-        </h1>
-        <div className="flex items-center gap-2">
-          <span
-            className={`px-2 py-0.5 rounded text-xs font-medium ${ticket.priority === 'critical' ? 'var(--accent)' : 'var(--muted)'} text-var(--card)`}
-          >
-            {ticket.priority}
-          </span>
-          <span className="text-var(--muted) text-sm">{ticket.state}</span>
-        </div>
-      </header>
-
-      <main className="p-4 flex-1 overflow-y-auto">
-        {/* Ticket info summary */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+    <article data-testid="ticket-detail" aria-labelledby="ticket-title" className="flex h-full flex-col">
+      <header className="border-b border-border p-4">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-var(--muted) text-sm mb-1">Queue</p>
-            <p className="font-medium">{ticket.queue}</p>
+            <p className="font-mono text-xs text-muted">#{ticket.id.slice(0, 8)}</p>
+            <h1 id="ticket-title" className="text-xl font-semibold text-fg">
+              {ticket.category ?? ticket.queue}
+            </h1>
           </div>
-          <div>
-            <p className="text-var(--muted) text-sm mb-1">Priority</p>
-            <p className="font-medium text-var(--accent)">
-              {ticket.priority}
-            </p>
-          </div>
-          <div>
-            <p className="text-var(--muted) text-sm mb-1">State</p>
-            <p className="font-medium">{ticket.state}</p>
-          </div>
-          <div>
-            <p className="text-var(--muted) text-sm mb-1">Assignee</p>
-            <p className={ticket.assignedTechnicianId
-              ? 'text-var(--fg)'
-              : 'text-var(--muted) opacity-80'}>
-              {ticket.assignedTechnicianId || 'Unassigned'}
-            </p>
-          </div>
-        </div>
-
-        {/* Messages section */}
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-var(--fg) mb-3">Messages</h2>
-          <div className="space-y-3 max-h-80 overflow-y-auto">
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className="p-3 rounded bg-var(--card) border border-var(--border)"
-              >
-                <p className="text-var(--muted) whitespace-pre-wrap">{msg}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Add message form */}
-        <div className="border-t border-var(--border) pt-4">
-          <div className="flex gap-2">
-            <textarea
-              value={newMessage}
-              onChange={handleMessageChange}
-              rows={1}
-              maxRows={3}
-              className="flex-1 rounded border border-var(--border) bg-var(--card) p-2 text-var(--fg) focus:outline-none focus:ring-2 focus:ring-var(--accent) focus:ring-offset-2"
-              placeholder="Add a message..."
-              aria-label="Add message to ticket"
-            />
+          <div className="flex shrink-0 gap-2">
             <button
-              onClick={handleSendMessage}
-              className="py-2 px-4 rounded border border-var(--accent) bg-var(--accent) text-var(--card) font-medium hover:opacity-90 transition-opacity"
-              aria-label="Send message"
+              type="button"
+              onClick={() =>
+                dispatch(openAppWindow({ app: 'Terminal', title: `Terminal — ${machineId}`, machineId }))
+              }
+              className="rounded border border-border px-3 py-1.5 text-sm text-fg hover:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              Send
+              Open terminal
+            </button>
+            <button
+              type="button"
+              onClick={claim}
+              disabled={ticket.state !== 'open'}
+              className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Claim
             </button>
           </div>
         </div>
-      </main>
-    </div>
+        {notice && (
+          <p role="status" className="mt-2 text-sm text-muted">
+            {notice}
+          </p>
+        )}
+      </header>
+
+      <dl className="grid grid-cols-2 gap-4 border-b border-border p-4 text-sm md:grid-cols-4">
+        {[
+          ['Queue', ticket.queue],
+          ['Priority', ticket.priority],
+          ['State', ticket.state.replace('_', ' ')],
+          ['Machine', machineId],
+          ['Assignee', ticket.assignedTechnicianId ?? 'Unassigned'],
+          ['Created', new Date(ticket.createdAt).toLocaleString()],
+          ['Evidence', `${ticket.evidence.length} item(s)`],
+          ['Requester', ticket.requesterId],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-xs text-muted">{label}</dt>
+            <dd className="font-medium capitalize text-fg">{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <section aria-labelledby="messages-heading" className="flex min-h-0 flex-1 flex-col p-4">
+        <h2 id="messages-heading" className="mb-2 text-sm font-semibold text-fg">
+          Messages
+        </h2>
+        <ol className="flex-1 space-y-2 overflow-y-auto">
+          {messages.length === 0 && <li className="text-sm text-muted">No messages yet.</li>}
+          {messages.map((m, i) => (
+            <li key={i} className="rounded border border-border bg-card p-2 text-sm">
+              <p className="whitespace-pre-wrap text-fg">{m.text}</p>
+              <p className="mt-1 text-[11px] text-muted">
+                {m.status === 'sending' ? 'Sending…' : m.status === 'sent' ? 'Sent' : 'Not delivered — server unavailable'}
+              </p>
+            </li>
+          ))}
+        </ol>
+        <form onSubmit={send} className="mt-3 flex gap-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={2}
+            placeholder="Reply to the requester…"
+            aria-label="Message to requester"
+            className="flex-1 resize-none rounded border border-border bg-card p-2 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          />
+          <button
+            type="submit"
+            className="self-end rounded bg-accent px-4 py-2 text-sm font-medium text-bg hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Send
+          </button>
+        </form>
+      </section>
+    </article>
   );
 }

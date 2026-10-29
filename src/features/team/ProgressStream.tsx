@@ -20,7 +20,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { selectProgressStream, selectTeamStatus, selectTeamError } from './api';
 import { clearProgressStream } from './slice';
 
-const ProgressStream: React.FC = () => {
+export const ProgressStream: React.FC = () => {
   const dispatch = useDispatch();
   const progressStream = useSelector(
     (state: RootState) => state.team.progressStream
@@ -65,8 +65,8 @@ const ProgressStream: React.FC = () => {
       {/* Progress stream table */}
       <div className="rounded-md overflow-hidden" style={{ background: 'var(--card)' }}>
         <div className="p-3 border-b" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
-          <h3 className="text-font-medium text-var(--fg) row-span-1">
-            Progress Stream <span className="text-xs text-var(--muted)">({progressStream.length})</span>
+          <h3 className="text-font-medium text-fg row-span-1">
+            Progress Stream <span className="text-xs text-muted">({progressStream.length})</span>
           </h3>
         </div>
         <div className="h-64 overflow-y-auto" style={{ background: 'var(--bg)' }}>
@@ -88,7 +88,7 @@ const ProgressStream: React.FC = () => {
                 <p className="text-xs font-medium truncate">
                   {entry.labId || 'Unassigned lab'}
                 </p>
-                <p className="text-xs text-var(--muted) truncate">
+                <p className="text-xs text-muted truncate">
                   Progress: {entry.progress}%
                 </p>
               </div>
@@ -101,7 +101,7 @@ const ProgressStream: React.FC = () => {
             </div>
           ))}
           {progressStream.length === 0 && (
-            <p className="text-var(--muted) text-center py-8">
+            <p className="text-muted text-center py-8">
               No progress updates yet
             </p>
           )}
@@ -111,6 +111,3 @@ const ProgressStream: React.FC = () => {
   );
 };
 
-export const ProgressStream: React.FC = () => {
-  return <ProgressStream />;
-};

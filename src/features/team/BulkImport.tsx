@@ -21,7 +21,7 @@ import { selectCohort } from './api';
 import { resetBulkImport as resetBulkImportSlice } from './slice';
 import { useNotification } from '../shared/components/Notification';
 
-const BulkImport: React.FC = () => {
+export const BulkImport: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const userRole = useSelector((state: RootState) => state.auth.user?.role);
@@ -84,10 +84,10 @@ const BulkImport: React.FC = () => {
     <div className="space-y-4" style={{ minHeight: '400px' }}>
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-var(--fg)">
+        <h2 className="text-xl font-semibold text-fg">
           Bulk Assignment Import
         </h2>
-        <p className="text-var(--muted) text-sm">
+        <p className="text-muted text-sm">
           CSV upload to create assignments for a cohort
         </p>
       </div>
@@ -99,19 +99,19 @@ const BulkImport: React.FC = () => {
             type="file"
             accept=".csv, .xlsx"
             onChange={handleFileChange}
-            className="block w-full text-sm text-var(--muted) file-entry"
+            className="block w-full text-sm text-muted file-entry"
             aria-label="Select CSV or Excel file for bulk import"
             disabled={isBulkImportLoading}
           />
           <label
-            className="cursor-pointer rounded-md border-2 border-var(--border) bg-var(--card) p-3 transition-colors duration-150 hover:border-var(--accent) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-var(--accent)"
+            className="cursor-pointer rounded-md border-2 border-border bg-card p-3 transition-colors duration-150 hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             onClick={() => (document.querySelector('input[type="file"]') as HTMLInputElement).click()}
             aria-label="Click to select CSV or Excel file"
           >
             <span className="font-medium">Select CSV File</span>
-            <span className="text-var(--muted) ml-2">(.csv, .xlsx)</span>
+            <span className="text-muted ml-2">(.csv, .xlsx)</span>
           </label>
-          <p className="text-var(--muted) text-xs mt-1">
+          <p className="text-muted text-xs mt-1">
             Max 5MB, UTF-8 encoded
           </p>
         </div>
@@ -123,23 +123,23 @@ const BulkImport: React.FC = () => {
           {importResult.success ? (
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <span className="text-var(--accent)">✓ Successfully imported</span>
+                <span className="text-accent">✓ Successfully imported</span>
                 <br />
                 <span>{importResult.imported} assignments</span>
               </div>
               <div>
-                <span className="text-var(--muted)">× Failed</span>
+                <span className="text-muted">× Failed</span>
                 <br />
                 <span>{importResult.failed} assignments</span>
               </div>
             </div>
           ) : (
             <div>
-              <span className="text-var(--muted)">0 assignments imported</span>
+              <span className="text-muted">0 assignments imported</span>
               <br />
-              <span className="text-var(--accent)">× {importResult.failed} failed</span>
+              <span className="text-accent">× {importResult.failed} failed</span>
               {importResult.errors.length > 0 && (
-                <div className="mt-2 text-xs text-var(--muted) overflow-x-auto">
+                <div className="mt-2 text-xs text-muted overflow-x-auto">
                   {importResult.errors.slice(0, 5).map((err, i) => (
                     <div key={i} className="rounded-md p-1" style={{ background: 'var(--bg)' }}>
                       <span className="font-medium">Row {err.row}</span>
@@ -147,7 +147,7 @@ const BulkImport: React.FC = () => {
                     </div>
                   ))}
                   {importResult.errors.length > 5 && (
-                    <p className="text-var(--muted) ml-2">+ {importResult.errors.length - 5} more errors</p>
+                    <p className="text-muted ml-2">+ {importResult.errors.length - 5} more errors</p>
                   )}
                 </div>
               )}
@@ -167,14 +167,14 @@ const BulkImport: React.FC = () => {
       <div className="mt-3 flex gap-2">
         <button
           onClick={() => dispatch(resetBulkImportSlice())}
-          className="px-3 py-1 text-sm text-var(--muted) bg-var(--border) rounded-md hover:bg-var(--accent) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-var(--accent)"
+          className="px-3 py-1 text-sm text-muted bg-border rounded-md hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           aria-label="Cancel bulk import"
         >
           Cancel
         </button>
         <button
           onClick={() => navigate('/team')}
-          className="px-3 py-1 text-sm text-var(--fg) bg-var(--card) rounded-md hover:bg-var(--accent) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-var(--accent)"
+          className="px-3 py-1 text-sm text-fg bg-card rounded-md hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           aria-label="Return to team dashboard"
         >
           Back to Dashboard
@@ -184,6 +184,3 @@ const BulkImport: React.FC = () => {
   );
 };
 
-export const BulkImport: React.FC = () => {
-  return <BulkImport />;
-};
