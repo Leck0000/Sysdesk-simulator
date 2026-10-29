@@ -59,6 +59,11 @@ jobs:
           # https://<owner>.github.io/<repository name>/ (read in vite.config.ts).
           VITE_BASE: /${{ github.event.repository.name }}/
 
+      # SPA fallback: GitHub Pages serves 404.html for unknown paths, so deep links
+      # such as /<repo>/team load the app and BrowserRouter renders the route.
+      - name: Add 404.html SPA fallback
+        run: cp dist/index.html dist/404.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
