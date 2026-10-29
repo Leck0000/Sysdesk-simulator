@@ -4,6 +4,7 @@
  * Nothing here runs against a real server.
  */
 import type { Ticket } from '../features/tickets/slice';
+import type { CohortStudent, LabProgress } from '../features/team/api';
 
 export function isDemoMode(search: string = typeof window !== 'undefined' ? window.location.search : ''): boolean {
   return new URLSearchParams(search).get('demo') === '1' || import.meta.env.VITE_DEMO === '1';
@@ -109,3 +110,39 @@ export const DEMO_SUBSYSTEMS: Record<string, unknown> = {
     { letter: 'D', fsType: 'NTFS', sizeBytes: 1_000_000_000_000, freeBytes: 640_000_000_000 },
   ],
 };
+
+const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+
+const DEMO_LAB_ID = '9d8c7b6a-5f4e-4d3c-8b2a-19f8e7d6c501';
+
+const student = (
+  n: number,
+  name: string,
+  fields: Pick<CohortStudent, 'progress' | 'status'> & { activeMinutesAgo: number }
+): CohortStudent => ({
+  id: `2a6f0c4e-8b1d-4f3a-9c5e-7d2b1a0f3e${String(n).padStart(2, '0')}`,
+  name,
+  role: 'technician',
+  labId: DEMO_LAB_ID,
+  progress: fields.progress,
+  status: fields.status,
+  lastActive: minutesAgo(fields.activeMinutesAgo),
+});
+
+/** Sample cohort roster for Team mode (shape of GET /team/cohort). */
+export const DEMO_COHORT: CohortStudent[] = [
+  student(1, 'Aisha Rahman', { progress: 100, status: 'complete', activeMinutesAgo: 2 }),
+  student(2, 'Ben Carter', { progress: 72, status: 'running', activeMinutesAgo: 1 }),
+  student(3, 'Chen Wei', { progress: 45, status: 'running', activeMinutesAgo: 3 }),
+  student(4, 'Daniela Souza', { progress: 30, status: 'error', activeMinutesAgo: 4 }),
+  student(5, 'Elias Novak', { progress: 10, status: 'idle', activeMinutesAgo: 25 }),
+  student(6, 'Farah Ismail', { progress: 88, status: 'running', activeMinutesAgo: 1 }),
+];
+
+/** Sample lab_progress stream (shape of GET /team/lab-progress), oldest first. */
+export const DEMO_LAB_PROGRESS: LabProgress[] = [12, 20, 31, 38, 47, 55, 61, 69].map((progress, i, all) => ({
+  labId: DEMO_LAB_ID,
+  progress,
+  activeMachines: 4 + (i % 3),
+  timestamp: minutesAgo((all.length - i) * 3),
+}));

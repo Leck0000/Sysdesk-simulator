@@ -52,5 +52,6 @@ Add `?demo=1` to the URL (or set `VITE_DEMO=1`) to seed:
 - 5 sample tickets
 - Services panel data (6 services)
 - Event Log panel data (2 events)
+- Team mode (`/team?demo=1`): a 6-student cohort and a lab progress stream
 
 Without demo mode and no backend running, the ticket queue shows an error message — this is expected.

@@ -17,7 +17,8 @@ import { useAppDispatch } from '../../app/hooks';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../../app/store';
 import type { CohortStudent } from './api';
-import { subscribeLabProgressThunk } from './slice';
+import { addProgressEntry, clearProgressStream, fetchCohort, setCohort, subscribeLabProgressThunk } from './slice';
+import { DEMO_COHORT, DEMO_LAB_PROGRESS, isDemoMode } from '../../app/demo';
 
 // Student progress bar constants
 const PROGRESS_COLOR = 'var(--accent)';
@@ -48,6 +49,7 @@ const StudentRow: React.FC<StudentRowProps> = ({ student, onViewDetail }) => {
         </p>
         <p className="text-xs text-muted line-clamp-1" style={{ overflow: 'hidden' }}>
           {student.status}
+          {isStale && ' · stale'}
         </p>
       </div>
       <div className="w-24">
@@ -61,9 +63,6 @@ const StudentRow: React.FC<StudentRowProps> = ({ student, onViewDetail }) => {
             aria-valuenow={progress}
             aria-label={`Progress ${progress}%`}
           />
-          {isStale && (
-            <span className="text-muted text-xs absolute left-1 top-1">stale</span>
-          )}
         </div>
       </div>
     </div>
@@ -75,17 +74,18 @@ const ProgressHistogram: React.FC<{ data: Array<{ progress: number; status: stri
     return <p className="text-muted">No progress data yet</p>;
   }
 
+  // Bins 0–24, 25–49, 50–74, 75–100 (the last bin includes 100).
   const bins = [0, 25, 50, 75, 100];
   const counts = bins.slice(0, -1).map((bin, i) =>
-    data.filter((d) => d.progress > bin && d.progress <= bins[i + 1]!).length
+    data.filter((d) => d.progress >= bin && (d.progress < bins[i + 1]! || (i === bins.length - 2 && d.progress === 100))).length
   );
 
   return (
     <div className="space-y-1">
       {counts.map((count, i) => (
         <div key={i} className="flex items-center justify-between text-xs">
-          <span className="text-muted">${bins[i]!}+%</span>
-          <span>{count || 0} students</span>
+          <span className="text-muted">{bins[i]!}+%</span>
+          <span>{count} {count === 1 ? 'student' : 'students'}</span>
           <div
             className="flex h-1.5 rounded-full bg-border overflow-hidden w-24"
             style={{ width: `${(count / Math.max(data.length, 1)) * 100}%` }}
@@ -125,15 +125,22 @@ export const CohortDashboard: React.FC = () => {
   const teamStatus = useSelector((state: RootState) => state.team.status);
   const teamError = useSelector((state: RootState) => state.team.error);
 
-  // Effect: subscribe to lab progress WS events
+  // Initial data: demo seed, or the cohort API + lab progress subscription.
   useEffect(() => {
-    dispatch(subscribeLabProgressThunk('')); // labId populated by WS room
+    if (isDemoMode()) {
+      dispatch(setCohort(DEMO_COHORT));
+      dispatch(clearProgressStream());
+      for (const entry of DEMO_LAB_PROGRESS) dispatch(addProgressEntry(entry));
+      return;
+    }
+    void dispatch(fetchCohort());
+    void dispatch(subscribeLabProgressThunk('')); // labId populated by WS room
   }, [dispatch]);
 
-  // Compute histogram data from progress stream
-  const histogramData: Array<{ progress: number; status: string }> = progressStream.map((entry) => ({
-    progress: entry.progress,
-    status: entry.labId ? 'in_lab' : 'idle',
+  // Histogram of the roster's progress (each row counts students)
+  const histogramData: Array<{ progress: number; status: string }> = cohort.map((s) => ({
+    progress: s.progress,
+    status: s.status,
   }));
 
   // Compute progress line data (last 10 entries)
@@ -159,7 +166,7 @@ export const CohortDashboard: React.FC = () => {
       )}
 
       {/* Cohort table */}
-      <div className="rounded-md overflow-hidden" style={{ background: 'var(--card)' }}>
+      <section aria-label="Cohort" className="rounded-md overflow-hidden" style={{ background: 'var(--card)' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-3" style={{ background: 'var(--card)' }}>
           {cohort.map((student: CohortStudent) => (
             <StudentRow
@@ -169,10 +176,11 @@ export const CohortDashboard: React.FC = () => {
             />
           ))}
         </div>
-        {cohort.length === 0 && (
+        {/* Empty state: only once the roster has actually loaded and is empty. */}
+        {teamStatus === 'succeeded' && cohort.length === 0 && (
           <p className="text-muted p-4 text-center">No students in cohort</p>
         )}
-      </div>
+      </section>
 
       {/* Progress histogram */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2" style={{ marginTop: '-4px' }}>

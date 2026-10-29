@@ -7,6 +7,9 @@ import reducer, {
   addProgressEntry,
   clearProgressStream,
   resetBulkImport,
+  setCohort,
+  fetchCohort,
+  subscribeLabProgressThunk,
 } from './slice';
 import type { Assignment, CohortStudent, LabProgress } from './api';
 
@@ -50,11 +53,18 @@ describe('Team Slice', () => {
     expect(reducer(dirty, clearTeamState())).toEqual(init());
   });
 
-  it('setSelectedAssignment / clearSelectedAssignment', () => {
-    let state = reducer(init(), setSelectedAssignment(assignment));
-    expect(state.selectedAssignment).toEqual(assignment);
-    state = reducer(state, clearSelectedAssignment());
-    expect(state.selectedAssignment).toBeNull();
+  describe('setSelectedAssignment', () => {
+    it('sets the selected assignment', () => {
+      const state = reducer(init(), setSelectedAssignment(assignment));
+      expect(state.selectedAssignment).toEqual(assignment);
+    });
+  });
+
+  describe('clearSelectedAssignment', () => {
+    it('clears the selected assignment', () => {
+      const selected: TeamState = { ...init(), selectedAssignment: assignment };
+      expect(reducer(selected, clearSelectedAssignment()).selectedAssignment).toBeNull();
+    });
   });
 
   describe('addProgressEntry', () => {
@@ -82,5 +92,36 @@ describe('Team Slice', () => {
     const state = reducer(dirty, resetBulkImport());
     expect(state.bulkImport).toBeNull();
     expect(state.status).toBe('idle');
+  });
+
+  describe('roster loading (fetchCohort / setCohort)', () => {
+    it('fetchCohort.pending marks loading and clears a previous error', () => {
+      const state = reducer({ ...init(), error: 'old' }, fetchCohort.pending('r1', undefined));
+      expect(state.status).toBe('loading');
+      expect(state.error).toBeNull();
+    });
+
+    it('fetchCohort.fulfilled stores the roster', () => {
+      const state = reducer(init(), fetchCohort.fulfilled([student], 'r1', undefined));
+      expect(state.cohort).toEqual([student]);
+      expect(state.status).toBe('succeeded');
+    });
+
+    it('fetchCohort.rejected records the error', () => {
+      const state = reducer(init(), fetchCohort.rejected(null, 'r1', undefined, 'Failed to fetch cohort'));
+      expect(state.status).toBe('failed');
+      expect(state.error).toBe('Failed to fetch cohort');
+    });
+
+    it('setCohort replaces the roster and marks it loaded', () => {
+      const state = reducer({ ...init(), status: 'failed', error: 'x' }, setCohort([student]));
+      expect(state).toMatchObject({ cohort: [student], status: 'succeeded', error: null });
+    });
+
+    it('subscribeLabProgressThunk.fulfilled seeds the progress stream', () => {
+      const entries = [progress(1), progress(2)];
+      const state = reducer(init(), subscribeLabProgressThunk.fulfilled(entries, 'r1', 'lab'));
+      expect(state.progressStream).toEqual(entries);
+    });
   });
 });
