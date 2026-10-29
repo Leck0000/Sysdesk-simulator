@@ -18,7 +18,6 @@ import { z } from 'zod';
 // Import ws actions and types
 import { wsSend, createSendCommand, ClientEventType } from '../../shared/ws';
 import { desktopSlice } from './slice';
-import type { DesktopWindow } from './slice';
 
 // Registry key schema
 const RegistryKeySchema = z.object({
@@ -46,12 +45,12 @@ interface RegistryEditorProps {
 const RegistryEditor: React.FC<RegistryEditorProps> = ({ windowId }) => {
   const dispatch = useDispatch();
   const { sessionId } = useSelector(
-    (state: RootState) => state.ws?.state ?? { session: { sessionId: null } }
+    (state: RootState) => state.ws
   );
   const machineId = useSelector(
     (state: RootState) => {
-      const windows = state.desktop?.windows ?? [];
-      const desktopWindow = windows.find((w: DesktopWindow) => w.id === windowId);
+      const windows = state.desktop.windows;
+      const desktopWindow = windows.find((w) => w.id === windowId);
       return desktopWindow?.machineId ?? windowId;
     }
   );

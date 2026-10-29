@@ -21,7 +21,6 @@ import { z } from 'zod';
 // Import ws actions and types
 import { wsSend, createSendCommand, ClientEventType } from '../../shared/ws';
 import { desktopSlice } from './slice';
-import type { DesktopWindow } from './slice';
 
 // Type-safe terminal dimensions
 const terminalDimensionsSchema = z.object({
@@ -162,12 +161,12 @@ const LazyTerminal: React.FC<{
 const TerminalWindow: React.FC<TerminalWindowProps> = ({ windowId, className }) => {
   const dispatch = useDispatch();
   const { sessionId } = useSelector(
-    (state: RootState) => state.ws?.state ?? { sessionId: null }
+    (state: RootState) => state.ws
   );
   const machineId = useSelector(
     (state: RootState) => {
-      const windows = state.desktop?.windows ?? [];
-      const desktopWindow = windows.find((w: DesktopWindow) => w.id === windowId);
+      const windows = state.desktop.windows;
+      const desktopWindow = windows.find((w) => w.id === windowId);
       return desktopWindow?.machineId ?? windowId;
     }
   );

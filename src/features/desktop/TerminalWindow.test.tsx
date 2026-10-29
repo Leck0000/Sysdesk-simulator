@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { desktopSlice } from './slice';
+import wsReducer, { initialWSState } from '../../shared/ws/slice';
 import { TerminalWindow } from './TerminalWindow';
 
 // Mock the ws module that TerminalWindow source imports (same relative path pattern)
@@ -50,7 +51,9 @@ vi.mock('@xterm/addon-web-links', () => ({
 const makeStore = () => configureStore({
   reducer: {
     desktop: desktopSlice.reducer,
+    ws: wsReducer,
   },
+  preloadedState: { ws: { ...initialWSState, sessionId: 'test-session' } },
 });
 
 describe('TerminalWindow Component', () => {

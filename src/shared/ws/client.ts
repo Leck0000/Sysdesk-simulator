@@ -244,11 +244,13 @@ export class WSClient extends EventEmitter {
           this.stopHeartbeat();
           this.clearPendingAcks(new Error('Connection closed'));
           this.emit('close', event.code, event.reason, event.wasClean);
+          this.dispatch?.(wsDisconnected({ code: event.code, reason: event.reason, wasClean: event.wasClean }));
 
           if (!this.isIntentionalDisconnect && this.reconnectAttempt < this.config.maxReconnectAttempts) {
             this.scheduleReconnect();
           } else if (!this.isIntentionalDisconnect) {
             this.emit('reconnect_failed');
+            this.dispatch?.(wsReconnectFailed({ maxAttempts: this.config.maxReconnectAttempts }));
           }
         };
 
@@ -571,6 +573,13 @@ export class WSClient extends EventEmitter {
 
     this.reconnectAttempt++;
     this.emit('reconnecting', this.reconnectAttempt, nextRetryMs);
+    this.dispatch?.(
+      wsReconnecting({
+        attempt: this.reconnectAttempt,
+        maxAttempts: this.config.maxReconnectAttempts,
+        nextRetryMs,
+      })
+    );
 
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(() => {
