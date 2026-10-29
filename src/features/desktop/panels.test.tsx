@@ -61,12 +61,23 @@ describe.each(cases)('$name data flow', ({ Panel, subsystem, loading }) => {
   });
 });
 
+const fixtureText: Record<string, RegExp> = {
+  services: /Print Spooler/,
+  'event-log': /Print Spooler service terminated/,
+  registry: /HKLM\\SOFTWARE\\Policies\\.*\\NoAutoUpdate/,
+  network: /Ethernet0/,
+  ad: /Dana Whitfield/,
+  filesystem: /NTFS/,
+};
+
 describe('demo subsystem fixtures', () => {
-  it('render in their panels', () => {
-    const store = setup(ServicesPanel);
+  it.each(cases)('$name renders its demo fixture without a schema error', ({ Panel, subsystem, loading }) => {
+    const store = setup(Panel);
     act(() => {
-      store.dispatch(applyStateDelta({ subsystem: 'services', op: 'set', value: DEMO_SUBSYSTEMS['services'] }));
+      store.dispatch(applyStateDelta({ subsystem, op: 'set', value: DEMO_SUBSYSTEMS[subsystem] }));
     });
-    expect(screen.getByText('Print Spooler')).toBeInTheDocument();
+    expect(screen.queryByText(loading)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Unexpected .* data/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(fixtureText[subsystem] ?? /^$/).length).toBeGreaterThan(0);
   });
 });

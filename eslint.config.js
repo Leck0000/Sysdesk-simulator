@@ -27,7 +27,7 @@ export default [
   },
   {
     // Node-side config / tooling files
-    files: ['*.{js,cjs,mjs,ts}', 'tests/**/*.ts'],
+    files: ['*.{js,cjs,mjs,ts}', 'tests/**/*.ts', 'scripts/**/*.mjs'],
     languageOptions: { globals: { ...globals.node } },
   },
   {

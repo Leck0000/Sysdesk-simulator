@@ -77,4 +77,35 @@ export const DEMO_SUBSYSTEMS: Record<string, unknown> = {
       eventId: '1014',
     },
   ],
+  registry: [
+    { path: String.raw`HKLM\SYSTEM\CurrentControlSet\Services\Spooler\Start`, value: '2', type: 'DWORD' },
+    { path: String.raw`HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU\NoAutoUpdate`, value: '1', type: 'DWORD' },
+    { path: String.raw`HKCU\Network\S\RemotePath`, value: String.raw`\\fs01\shared`, type: 'String' },
+  ],
+  network: [
+    { name: 'Ethernet0', status: 'up', ip: '169.254.12.40', netmask: '255.255.0.0', mac: '00-15-5D-01-02-03' },
+    { name: 'Wi-Fi', status: 'down', mac: '00-15-5D-01-02-04' },
+  ],
+  ad: [
+    {
+      id: '5f0b6a2e-1c3d-4e5f-8a9b-00112233aa01',
+      name: 'Dana Whitfield',
+      distinguishedName: 'CN=Dana Whitfield,OU=Finance,DC=corp,DC=example',
+      enabled: false,
+      whenCreated: '2025-03-14T09:00:00Z',
+      lastLogon: hoursAgo(26),
+    },
+    {
+      id: '5f0b6a2e-1c3d-4e5f-8a9b-00112233aa02',
+      name: 'Sam Ortiz',
+      distinguishedName: 'CN=Sam Ortiz,OU=IT,DC=corp,DC=example',
+      enabled: true,
+      whenCreated: '2024-11-02T09:00:00Z',
+      lastLogon: hoursAgo(1),
+    },
+  ],
+  filesystem: [
+    { letter: 'C', fsType: 'NTFS', sizeBytes: 255_000_000_000, freeBytes: 3_100_000_000 },
+    { letter: 'D', fsType: 'NTFS', sizeBytes: 1_000_000_000_000, freeBytes: 640_000_000_000 },
+  ],
 };
