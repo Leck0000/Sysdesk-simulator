@@ -7,7 +7,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { VerificationPage } from './VerificationPage';
 
 // Mock window.matchMedia for responsive tests
-global.matchMedia = global.matchMedia || ((params: string) => ({
+globalThis.matchMedia = globalThis.matchMedia || ((params: string) => ({
   matches: false,
   media: params,
   onchange: null,
@@ -54,7 +54,7 @@ describe('VerificationPage', () => {
       render(
         <Provider store={store}>
           <VerificationPage
-            verificationResult={{ valid: true, payload: { ticket_type: 'bug', ticket_id: 'tb123', score: 85, criteria_met: { c1: 20 }, rubric_hash: 'abc123', issued_at: 1730102400000 }, signature: 'b64...' }}
+            verificationResult={{ valid: true, payload: { ticket_type: 'bug', ticket_id: 'tb123', score: 85, criteria_met: { c1: 20 }, issued_at: 1730102400000 }, signature: 'b64...' }}
           />
         </Provider>
       );

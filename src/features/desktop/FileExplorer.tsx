@@ -52,7 +52,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ windowId }) => {
   if (isLoading) {
     return (
       <div
-        data-testid="file-explorer"
+        data-testid="FileExplorer"
         style={{
           backgroundColor: 'var(--card)',
           color: 'var(--fg)',
@@ -68,7 +68,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ windowId }) => {
 
   return (
     <div
-      data-testid="file-explorer"
+      data-testid="FileExplorer"
       style={{
         backgroundColor: 'var(--card)',
         color: 'var(--fg)',

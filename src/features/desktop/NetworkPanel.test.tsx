@@ -14,7 +14,7 @@ import wsReducer, { initialWSState } from '../../shared/ws/slice';
 import { NetworkPanel } from './NetworkPanel';
 
 // Mock window.matchMedia for responsive tests
-global.matchMedia = global.matchMedia || ((params: string) => ({
+globalThis.matchMedia = globalThis.matchMedia || ((params: string) => ({
   matches: false,
   media: params,
   onchange: null,
@@ -45,7 +45,7 @@ describe('NetworkPanel', () => {
         <NetworkPanel windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('network-panel');
+    const component = screen.getByTestId('NetworkPanel');
     expect(component).toBeInTheDocument();
   });
 
@@ -55,7 +55,7 @@ describe('NetworkPanel', () => {
         <NetworkPanel windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('network-panel');
+    const component = screen.getByTestId('NetworkPanel');
     expect(component).toHaveStyle('background-color: var(--card)');
     expect(component).toHaveStyle('color: var(--fg)');
   });
@@ -66,7 +66,7 @@ describe('NetworkPanel', () => {
         <NetworkPanel windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('network-panel');
+    const component = screen.getByTestId('NetworkPanel');
     expect(component).toHaveAttribute('role', 'region');
   });
 
@@ -84,7 +84,7 @@ describe('NetworkPanel', () => {
     // Manually set adapters state
     store.dispatch(
       desktopSlice.actions.openAppWindow({
-        app: 'network-panel',
+        app: 'NetworkPanel',
         title: 'Network',
         machineId: 'machine-001',
       })
@@ -95,7 +95,7 @@ describe('NetworkPanel', () => {
         <NetworkPanel windowId="win-001" />
       </Provider>
     );
-    const container = screen.getByTestId('network-panel');
+    const container = screen.getByTestId('NetworkPanel');
     expect(container).toBeInTheDocument();
   });
 });

@@ -53,7 +53,7 @@ const NetworkPanel: React.FC<NetworkPanelProps> = ({ windowId }) => {
   if (isLoading) {
     return (
       <div
-        data-testid="network-panel"
+        data-testid="NetworkPanel"
         style={{
           backgroundColor: 'var(--card)',
           color: 'var(--fg)',
@@ -69,7 +69,7 @@ const NetworkPanel: React.FC<NetworkPanelProps> = ({ windowId }) => {
 
   return (
     <div
-      data-testid="network-panel"
+      data-testid="NetworkPanel"
       style={{
         backgroundColor: 'var(--card)',
         color: 'var(--fg)',

@@ -12,8 +12,12 @@
 */
 
 import React, { useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
+import { useAppDispatch } from '../../app/hooks';
 import { useNavigate } from 'react-router-dom';
+import type { RootState } from '../../app/store';
+import type { CohortStudent } from './api';
+import { subscribeLabProgressThunk } from './slice';
 
 // Student progress bar constants
 const PROGRESS_COLOR = 'var(--accent)';
@@ -29,12 +33,11 @@ const StudentRow: React.FC<StudentRowProps> = ({ student, onViewDetail }) => {
 
   return (
     <div
-      className="flex items-center gap-4 rounded-md p-3 transition-colors duration-200"
+      className="flex items-center gap-4 rounded-md p-3 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       onClick={() => onViewDetail && onViewDetail(student)}
       role="button"
-      tabindex="0"
+      tabIndex={0}
       aria-label={`View details for ${student.name} — progress ${student.progress}%`}
-      style={{ outline: 'none' }}
     >
       <div className="w-16 h-16 rounded-md flex items-center justify-center shrink-0" style={{ background: 'var(--card)' }}>
         {student.name.charAt(0)}
@@ -52,8 +55,9 @@ const StudentRow: React.FC<StudentRowProps> = ({ student, onViewDetail }) => {
           <div
             className="h-full rounded-bg"
             style={{ width: `${progress}%`, background: progress > 0 ? PROGRESS_COLOR : 'transparent' }}
-            aria-valuemin="0"
-            aria-valuemax="100"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
             aria-valuenow={progress}
             aria-label={`Progress ${progress}%`}
           />
@@ -72,19 +76,19 @@ const ProgressHistogram: React.FC<{ data: Array<{ progress: number; status: stri
   }
 
   const bins = [0, 25, 50, 75, 100];
-  const counts = bins.map((bin, i) =>
-    data.filter((d) => d.progress > bins[i] && d.progress <= bins[i + 1]).length
+  const counts = bins.slice(0, -1).map((bin, i) =>
+    data.filter((d) => d.progress > bin && d.progress <= bins[i + 1]!).length
   );
 
   return (
     <div className="space-y-1">
-      {bins.map((bin, i) => (
-        <div key={bin} className="flex items-center justify-between text-xs">
-          <span className="text-muted">{bin}+%</span>
-          <span>{counts[i] || 0} students</span>
+      {counts.map((count, i) => (
+        <div key={i} className="flex items-center justify-between text-xs">
+          <span className="text-muted">${bins[i]!}+%</span>
+          <span>{count || 0} students</span>
           <div
             className="flex h-1.5 rounded-full bg-border overflow-hidden w-24"
-            style={{ width: `${(counts[i] / Math.max(data.length, 1)) * 100}%` }}
+            style={{ width: `${(count / Math.max(data.length, 1)) * 100}%` }}
           />
         </div>
       ))}
@@ -105,7 +109,7 @@ const ProgressLineChart: React.FC<{ data: Array<{ progress: number; timestamp: s
         <div
           key={i}
           className="flex-1 h-1.5 rounded-full bg-border overflow-hidden"
-          style={{ height: `${(entry.progress / 100) * 100}%`, background: PROGRESS_COLOR }}
+          style={{ height: `${entry.progress}%`, background: PROGRESS_COLOR }}
         />
       ))}
     </div>
@@ -113,10 +117,11 @@ const ProgressLineChart: React.FC<{ data: Array<{ progress: number; timestamp: s
 };
 
 export const CohortDashboard: React.FC = () => {
-  const dispatch = useDispatch();
+  
   const navigate = useNavigate();
   const cohort = useSelector((state: RootState) => state.team.cohort);
   const progressStream = useSelector((state: RootState) => state.team.progressStream);
+  const dispatch = useAppDispatch();
   const teamStatus = useSelector((state: RootState) => state.team.status);
   const teamError = useSelector((state: RootState) => state.team.error);
 
@@ -126,13 +131,13 @@ export const CohortDashboard: React.FC = () => {
   }, [dispatch]);
 
   // Compute histogram data from progress stream
-  const histogramData = progressStream.map((entry) => ({
+  const histogramData: Array<{ progress: number; status: string }> = progressStream.map((entry) => ({
     progress: entry.progress,
     status: entry.labId ? 'in_lab' : 'idle',
   }));
 
   // Compute progress line data (last 10 entries)
-  const progressLineData = progressStream
+  const progressLineData: Array<{ progress: number; timestamp: string }> = progressStream
     .slice(-10)
     .map((entry) => ({
       progress: entry.progress,
@@ -156,7 +161,7 @@ export const CohortDashboard: React.FC = () => {
       {/* Cohort table */}
       <div className="rounded-md overflow-hidden" style={{ background: 'var(--card)' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-3" style={{ background: 'var(--card)' }}>
-          {cohort.map((student) => (
+          {cohort.map((student: CohortStudent) => (
             <StudentRow
               key={student.id}
               student={student}
@@ -181,7 +186,7 @@ export const CohortDashboard: React.FC = () => {
       <div className="mt-3 p-3 rounded-md" style={{ background: 'var(--card)' }}>
         <h4 className="text-sm font-medium text-fg mb-2">Progress Stream</h4>
         <div className="h-48 overflow-y-auto" style={{ background: 'var(--bg)' }}>
-          {progressStream.map((entry, i) => (
+          {progressStream.map((entry: { labId?: string; progress: number; timestamp: string }, i: number) => (
             <div
               key={i}
               className="flex items-center gap-2 text-xs p-1 rounded-md"

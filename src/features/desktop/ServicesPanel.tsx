@@ -52,7 +52,7 @@ const ServicesPanel: React.FC<ServicesPanelProps> = ({ windowId }) => {
   if (isLoading) {
     return (
       <div
-        data-testid="services-panel"
+        data-testid="ServicesPanel"
         style={{
           backgroundColor: 'var(--card)',
           color: 'var(--fg)',
@@ -68,7 +68,7 @@ const ServicesPanel: React.FC<ServicesPanelProps> = ({ windowId }) => {
 
   return (
     <div
-      data-testid="services-panel"
+      data-testid="ServicesPanel"
       style={{
         backgroundColor: 'var(--card)',
         color: 'var(--fg)',

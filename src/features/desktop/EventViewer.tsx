@@ -58,7 +58,7 @@ const EventViewer: React.FC<EventViewerProps> = ({ windowId }) => {
   if (isLoading) {
     return (
       <div
-        data-testid="event-viewer"
+        data-testid="EventViewer"
         style={{
           backgroundColor: 'var(--card)',
           color: 'var(--fg)',
@@ -74,7 +74,7 @@ const EventViewer: React.FC<EventViewerProps> = ({ windowId }) => {
 
   return (
     <div
-      data-testid="event-viewer"
+      data-testid="EventViewer"
       style={{
         backgroundColor: 'var(--card)',
         color: 'var(--fg)',

@@ -54,7 +54,7 @@ const ADUsersComputers: React.FC<ADUsersComputersProps> = ({ windowId }) => {
   if (isLoading) {
     return (
       <div
-        data-testid="ad-users-computers"
+        data-testid="ADUsersComputers"
         style={{
           backgroundColor: 'var(--card)',
           color: 'var(--fg)',
@@ -70,7 +70,7 @@ const ADUsersComputers: React.FC<ADUsersComputersProps> = ({ windowId }) => {
 
   return (
     <div
-      data-testid="ad-users-computers"
+      data-testid="ADUsersComputers"
       style={{
         backgroundColor: 'var(--card)',
         color: 'var(--fg)',

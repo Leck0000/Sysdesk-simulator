@@ -106,13 +106,13 @@ describe('authSlice', () => {
       const { reducer } = authSlice;
 
       const state = reducer(
-        { accessToken: 'token', user: { id: '1' }, roles: ['user'], status: 'succeeded' },
+        { accessToken: 'token', user: { id: '1', role: 'technician', name: 'Test User' }, roles: ['technician'], status: 'succeeded' },
         authSlice.actions.resetStatus()
       );
 
       expect(state.status).toBe('idle');
       expect(state.accessToken).toBe('token'); // other state preserved
-      expect(state.user).toEqual({ id: '1' });
+      expect(state.user).toEqual({ id: '1', role: 'technician', name: 'Test User' });
     });
   });
 });

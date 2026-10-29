@@ -15,15 +15,19 @@
    aria-labels, live region announcements.
 */
 
-import React from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { useAppDispatch } from '../../app/hooks';
+import type { RootState } from '../../app/store';
+import { subscribeLabProgressThunk } from './slice';
 
 export const ProgressStream: React.FC = () => {
-  const dispatch = useDispatch();
+  
   const progressStream = useSelector(
     (state: RootState) => state.team.progressStream
   );
   const teamStatus = useSelector((state: RootState) => state.team.status);
+  const dispatch = useAppDispatch();
   const teamError = useSelector((state: RootState) => state.team.error);
 
   // Effect: subscribe to WS lab progress events
@@ -68,7 +72,7 @@ export const ProgressStream: React.FC = () => {
           </h3>
         </div>
         <div className="h-64 overflow-y-auto" style={{ background: 'var(--bg)' }}>
-          {progressStream.map((entry, i) => (
+          {progressStream.map((entry: { labId?: string; progress: number; timestamp: string }, i: number) => (
             <div
               key={i}
               className="flex items-center gap-2 rounded-md p-1 transition-colors duration-150"

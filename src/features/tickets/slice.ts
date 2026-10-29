@@ -190,10 +190,11 @@ export const ticketsSlice = createSlice({
       const { ticketId, status, assigneeId, timestamp } = action.payload;
       const index = state.queue.findIndex((t: Ticket) => t.id === ticketId);
       if (index !== -1) {
+        const ticket = state.queue[index]!;
         state.queue[index] = {
-          ...state.queue[index],
+          ...ticket,
           state: status as Ticket['state'],
-          assignedTechnicianId: assigneeId ?? state.queue[index].assignedTechnicianId,
+          assignedTechnicianId: assigneeId ?? ticket.assignedTechnicianId,
           updatedAt: timestamp,
         };
       }

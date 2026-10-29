@@ -14,7 +14,7 @@ import wsReducer, { initialWSState } from '../../shared/ws/slice';
 import { ServicesPanel } from './ServicesPanel';
 
 // Mock window.matchMedia for responsive tests
-global.matchMedia = global.matchMedia || ((params: string) => ({
+globalThis.matchMedia = globalThis.matchMedia || ((params: string) => ({
   matches: false,
   media: params,
   onchange: null,
@@ -45,7 +45,7 @@ describe('ServicesPanel', () => {
         <ServicesPanel windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('services-panel');
+    const component = screen.getByTestId('ServicesPanel');
     expect(component).toBeInTheDocument();
   });
 
@@ -55,7 +55,7 @@ describe('ServicesPanel', () => {
         <ServicesPanel windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('services-panel');
+    const component = screen.getByTestId('ServicesPanel');
     expect(component).toHaveStyle('background-color: var(--card)');
     expect(component).toHaveStyle('color: var(--fg)');
   });
@@ -66,7 +66,7 @@ describe('ServicesPanel', () => {
         <ServicesPanel windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('services-panel');
+    const component = screen.getByTestId('ServicesPanel');
     expect(component).toHaveAttribute('role', 'region');
   });
 
@@ -84,7 +84,7 @@ describe('ServicesPanel', () => {
     // Manually set services state
     store.dispatch(
       desktopSlice.actions.openAppWindow({
-        app: 'services-panel',
+        app: 'ServicesPanel',
         title: 'Services',
         machineId: 'machine-001',
       })
@@ -95,7 +95,7 @@ describe('ServicesPanel', () => {
         <ServicesPanel windowId="win-001" />
       </Provider>
     );
-    const container = screen.getByTestId('services-panel');
+    const container = screen.getByTestId('ServicesPanel');
     expect(container).toBeInTheDocument();
   });
 });

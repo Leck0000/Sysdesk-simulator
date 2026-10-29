@@ -14,7 +14,7 @@ import wsReducer, { initialWSState } from '../../shared/ws/slice';
 import { FileExplorer } from './FileExplorer';
 
 // Mock window.matchMedia for responsive tests
-global.matchMedia = global.matchMedia || ((params: string) => ({
+globalThis.matchMedia = globalThis.matchMedia || ((params: string) => ({
   matches: false,
   media: params,
   onchange: null,
@@ -45,7 +45,7 @@ describe('FileExplorer', () => {
         <FileExplorer windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('file-explorer');
+    const component = screen.getByTestId('FileExplorer');
     expect(component).toBeInTheDocument();
   });
 
@@ -55,7 +55,7 @@ describe('FileExplorer', () => {
         <FileExplorer windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('file-explorer');
+    const component = screen.getByTestId('FileExplorer');
     expect(component).toHaveStyle('background-color: var(--card)');
     expect(component).toHaveStyle('color: var(--fg)');
   });
@@ -66,7 +66,7 @@ describe('FileExplorer', () => {
         <FileExplorer windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('file-explorer');
+    const component = screen.getByTestId('FileExplorer');
     expect(component).toHaveAttribute('role', 'region');
   });
 
@@ -84,7 +84,7 @@ describe('FileExplorer', () => {
     // Manually set drives state
     store.dispatch(
       desktopSlice.actions.openAppWindow({
-        app: 'file-explorer',
+        app: 'FileExplorer',
         title: 'File Explorer',
         machineId: 'machine-001',
       })
@@ -95,7 +95,7 @@ describe('FileExplorer', () => {
         <FileExplorer windowId="win-001" />
       </Provider>
     );
-    const container = screen.getByTestId('file-explorer');
+    const container = screen.getByTestId('FileExplorer');
     expect(container).toBeInTheDocument();
   });
 });

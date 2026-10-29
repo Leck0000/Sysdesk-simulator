@@ -11,7 +11,7 @@
  * Responsive: >=1280px desktop-first; collapses to drawer <1024px.
  */
 
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { subscribeToScoringUpdates, selectTicketForScoring } from './slice';
 import { selectSelectedTicket } from '../tickets/slice';
@@ -75,14 +75,14 @@ export const ScoreDashboard: React.FC = () => {
 
   // Subscribe to scoring updates on mount
   useEffect(() => {
-    dispatch(subscribeToScoringUpdates());
+    dispatch(subscribeToScoringUpdates() as unknown as ReturnType<typeof dispatch>);
     if (selectedTicketId) {
-      dispatch(selectTicketForScoring(selectedTicketId));
+      dispatch(selectTicketForScoring(selectedTicketId) as unknown as ReturnType<typeof dispatch>);
     }
   }, [dispatch, selectedTicketId]);
 
   // Render evidence log entries
-  const renderEvidence = (): JSX.Element => {
+  const renderEvidence = (): React.ReactElement => {
     return (
       <div className="evidence-log">
         <h4>Evidence Log</h4>

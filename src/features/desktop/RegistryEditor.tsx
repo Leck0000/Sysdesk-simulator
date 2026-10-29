@@ -51,7 +51,7 @@ const RegistryEditor: React.FC<RegistryEditorProps> = ({ windowId }) => {
   if (isLoading) {
     return (
       <div
-        data-testid="registry-editor"
+        data-testid="RegistryEditor"
         style={{
           backgroundColor: 'var(--card)',
           color: 'var(--fg)',
@@ -67,7 +67,7 @@ const RegistryEditor: React.FC<RegistryEditorProps> = ({ windowId }) => {
 
   return (
     <div
-      data-testid="registry-editor"
+      data-testid="RegistryEditor"
       style={{
         backgroundColor: 'var(--card)',
         color: 'var(--fg)',

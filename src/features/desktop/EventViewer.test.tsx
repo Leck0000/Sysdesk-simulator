@@ -14,7 +14,7 @@ import wsReducer, { initialWSState } from '../../shared/ws/slice';
 import { EventViewer } from './EventViewer';
 
 // Mock window.matchMedia for responsive tests
-global.matchMedia = global.matchMedia || ((params: string) => ({
+globalThis.matchMedia = globalThis.matchMedia || ((params: string) => ({
   matches: false,
   media: params,
   onchange: null,
@@ -60,7 +60,7 @@ describe('EventViewer', () => {
         <EventViewer windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('event-viewer');
+    const component = screen.getByTestId('EventViewer');
     expect(component).toBeInTheDocument();
   });
 
@@ -70,7 +70,7 @@ describe('EventViewer', () => {
         <EventViewer windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('event-viewer');
+    const component = screen.getByTestId('EventViewer');
     expect(component).toHaveStyle('background-color: var(--card)');
     expect(component).toHaveStyle('color: var(--fg)');
   });
@@ -81,7 +81,7 @@ describe('EventViewer', () => {
         <EventViewer windowId="win-001" />
       </Provider>
     );
-    const component = screen.getByTestId('event-viewer');
+    const component = screen.getByTestId('EventViewer');
     expect(component).toHaveAttribute('role', 'region');
   });
 
@@ -103,7 +103,7 @@ describe('EventViewer', () => {
       </Provider>
     );
     // Component structure check
-    const container = screen.getByTestId('event-viewer');
+    const container = screen.getByTestId('EventViewer');
     expect(container).toBeInTheDocument();
   });
 });

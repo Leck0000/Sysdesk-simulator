@@ -79,10 +79,13 @@ export const scoresSlice = createSlice({
       const updates = action.payload;
       // Update each criterion score
       Object.keys(updates).forEach((criterionId) => {
-        const score = updates[criterionId];
+        const score = updates[criterionId]!; // key exists because we're iterating over Object.keys
         // Find or create the criterion score entry
-        if (score !== undefined) {
-          // Map criterion IDs to names based on known categories
+        if (state.criterionScores[criterionId]) {
+          // Update existing
+          state.criterionScores[criterionId].score = score;
+        } else {
+          // Create new
           const criterionName = criterionId; // fallback name
           state.criterionScores[criterionId] = {
             id: criterionId,
@@ -90,8 +93,6 @@ export const scoresSlice = createSlice({
             score,
             maxScore: 100,
           };
-        } else {
-          state.criterionScores[criterionId].score = score;
         }
       });
 

@@ -17,6 +17,8 @@
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams } from 'react-router-dom';
+import type { RootState } from '../../app/store';
+import { fetchAssignments } from './slice';
 
 export const AssignmentView: React.FC = () => {
   const dispatch = useDispatch();
@@ -31,6 +33,10 @@ export const AssignmentView: React.FC = () => {
   const userId = useSelector(
     (state: RootState) => state.auth.user?.id
   );
+  const progressStream = useSelector((state: RootState) => state.team.progressStream);
+  const selectedLabProgress = selectedAssignment
+    ? progressStream.find((e) => e.labId === selectedAssignment.labId)?.progress ?? 0
+    : 0;
 
   // Role-based access: only instructors can view all assignments,
   // technicians can only view their assigned assignment
@@ -45,7 +51,7 @@ export const AssignmentView: React.FC = () => {
     // Load assignment details
     if (assignmentId && !selectedAssignment?.id) {
       const cohortId = assignmentId.split('-')[0] || '';
-      dispatch(fetchAssignments(cohortId));
+      dispatch(fetchAssignments(cohortId) as unknown as ReturnType<typeof dispatch>);
     }
   }, [assignmentId, dispatch, selectedAssignment?.id]);
 
@@ -110,12 +116,12 @@ export const AssignmentView: React.FC = () => {
         <div className="h-2 rounded-full bg-border overflow-hidden">
           <div
             className="h-full rounded-bg"
-            style={{ width: `${selectedAssignment.progress || 0}%` }}
-            aria-label={`Assignment progress ${selectedAssignment.progress || 0}%`}
+            style={{ width: `${selectedLabProgress}%` }}
+            aria-label={`Assignment progress ${selectedLabProgress}%`}
           />
         </div>
         <p className="text-xs text-muted mt-1">
-          {selectedAssignment.progress || 0}% complete
+          {selectedLabProgress}% complete
         </p>
       </div>
     </div>
