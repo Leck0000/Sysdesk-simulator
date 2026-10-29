@@ -1,5 +1,6 @@
 import { configureStore, Middleware } from '@reduxjs/toolkit';
 import { wsMiddleware } from '../shared/middleware/wsMiddleware';
+import { ticketsApi } from '../features/tickets/api';
 
 // Placeholder slice reducers matching ARCHITECTURE.md data models
 const createEmptySlice = (name: string) => ({
@@ -26,8 +27,9 @@ export const store = configureStore({
     team: teamSlice.reducer,
     certificates: certificatesSlice.reducer,
     layout: layoutSlice.reducer,
+    [ticketsApi.reducerPath]: ticketsApi.reducer,
   },
-  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(wsMiddleware),
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(ticketsApi.middleware, wsMiddleware),
   devTools: true,
 });
 

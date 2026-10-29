@@ -18,6 +18,7 @@ import { z } from 'zod';
 // Import ws actions and types
 import { wsSend, createSendCommand, ClientEventType } from '../../shared/ws';
 import { desktopSlice } from './slice';
+import type { DesktopWindow } from './slice';
 
 // AD User schema
 const AdUserSchema = z.object({
@@ -53,8 +54,8 @@ const ADUsersComputers: React.FC<ADUsersComputersProps> = ({ windowId }) => {
   const machineId = useSelector(
     (state: RootState) => {
       const windows = state.desktop?.windows ?? [];
-      const window = windows.find((w: any) => w.id === windowId);
-      return window?.machineId ?? windowId;
+      const desktopWindow = windows.find((w: DesktopWindow) => w.id === windowId);
+      return desktopWindow?.machineId ?? windowId;
     }
   );
   const [users, setUsers] = useState<AdUser[]>([]);

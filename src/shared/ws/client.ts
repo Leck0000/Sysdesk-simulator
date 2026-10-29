@@ -5,6 +5,7 @@
  * Integrates with Redux via wsMiddleware for single source of truth.
  */
 
+import type { UnknownAction } from '@reduxjs/toolkit';
 import type {
   WSEnvelope,
   ClientToServerPayload,
@@ -147,7 +148,7 @@ export class WSClient extends EventEmitter {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private isConnecting = false;
   private isIntentionalDisconnect = false;
-  private dispatch: ((action: unknown) => void) | null = null;
+  private dispatch: ((action: UnknownAction) => void) | null = null;
   private getState: (() => { auth: { accessToken?: string } }) | null = null;
 
   private constructor(config: WSClientConfig) {
@@ -185,7 +186,7 @@ export class WSClient extends EventEmitter {
    * Set Redux store dispatch and getState for middleware integration
    */
   setStore(
-    dispatch: (action: unknown) => void,
+    dispatch: (action: UnknownAction) => void,
     getState: () => { auth: { accessToken?: string } }
   ): void {
     this.dispatch = dispatch;

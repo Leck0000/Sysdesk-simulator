@@ -14,6 +14,7 @@ import { z } from 'zod';
 // ---------------------------------------------------------------------------
 
 const WindowSchema = z.object({
+  id: z.string().uuid(),
   title: z.string(),
   innerWidth: z.number().int().min(100),
   innerHeight: z.number().int().min(100),
@@ -24,9 +25,11 @@ const WindowSchema = z.object({
   draggable: z.boolean().default(true),
   minimized: z.boolean().default(false),
   maximized: z.boolean().default(false),
+  machineId: z.string().optional(),
+  app: z.string().optional(),
 });
 
-type Window = z.infer<typeof WindowSchema>;
+export type DesktopWindow = z.infer<typeof WindowSchema>;
 
 const ZOrderSchema = z.object({
   windowId: z.string().uuid(),
@@ -47,7 +50,7 @@ export enum AppType { EventViewer = 'event-viewer', ServicesPanel = 'services-pa
 
 export interface DesktopState {
   // Window list
-  windows: Window[];
+  windows: DesktopWindow[];
   // Z-order index (higher zIndex = rendered on top)
   zOrder: ZOrder[];
   // Currently active window ID
@@ -73,7 +76,7 @@ export const desktopSlice = createSlice({
   initialState,
   reducers: {
     /** Add a new window to the desktop */
-    addWindow: (state, action: PayloadAction<Omit<Window, 'id'>>) => {
+    addWindow: (state, action: PayloadAction<Omit<DesktopWindow, 'id'>>) => {
       const newWindow = {
         id: crypto.randomUUID(),
         title: action.payload.title,
@@ -106,12 +109,12 @@ export const desktopSlice = createSlice({
     /** Update a window's properties */
     updateWindow: (
       state,
-      action: PayloadAction<{ window: Partial<Window>; id: string; zIndex?: number }>
+      action: PayloadAction<{ window: Partial<DesktopWindow>; id: string; zIndex?: number }>
     ) => {
       const { window, id, zIndex } = action.payload;
       const idx = state.windows.findIndex((w) => w.id === id);
       if (idx !== -1) {
-        state.windows[idx] = { ...state.windows[idx], ...window } as Window;
+        state.windows[idx] = { ...state.windows[idx], ...window } as DesktopWindow;
       }
       // Update zIndex if provided
       if (zIndex !== undefined) {
@@ -233,7 +236,7 @@ export const desktopSlice = createSlice({
         machineId,
         app,
       };
-      state.windows.push(newWindow as Window);
+      state.windows.push(newWindow as DesktopWindow);
       if (!state.zOrder.some((z) => z.windowId === newWindow.id)) {
         state.zOrder.push({ windowId: newWindow.id, zIndex: state.zOrder.length });
       }

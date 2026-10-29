@@ -18,6 +18,7 @@ import { z } from 'zod';
 // Import ws actions and types
 import { wsSend, createSendCommand, ClientEventType } from '../../shared/ws';
 import { desktopSlice } from './slice';
+import type { DesktopWindow } from './slice';
 
 // Network state schema
 const NetworkInterfaceSchema = z.object({
@@ -58,8 +59,8 @@ const NetworkPanel: React.FC<NetworkPanelProps> = ({ windowId }) => {
   const machineId = useSelector(
     (state: RootState) => {
       const windows = state.desktop?.windows ?? [];
-      const window = windows.find((w: any) => w.id === windowId);
-      return window?.machineId ?? windowId;
+      const desktopWindow = windows.find((w: DesktopWindow) => w.id === windowId);
+      return desktopWindow?.machineId ?? windowId;
     }
   );
   const [adapters, setAdapters] = useState<NetworkAdapter[]>([]);

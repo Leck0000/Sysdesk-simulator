@@ -10,6 +10,7 @@
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { z } from 'zod';
+import type { RootState } from '../../app/store';
 
 // ---------------------------------------------------------------------------
 // Zod schemas (boundary validation — never pass raw network data downstream)
@@ -203,7 +204,7 @@ export const {
 } = ticketsApi;
 
 // Utility selectors for derived data
-export const selectTicketsApiState = (state: { ticketsApi: any }) => state.ticketsApi;
+export const selectTicketsApiState = (state: RootState) => state.ticketsApi;
 export const selectListTicketsResult = ticketsApi.endpoints.listTickets.select();
 
 // Utility selectors for loading states - use the RTK Query hook-based approach
