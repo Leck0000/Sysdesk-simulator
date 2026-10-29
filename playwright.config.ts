@@ -4,18 +4,19 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30000,
   retries: 0,
-  worker: 'process',
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:3000',
+    // Vite base is /opendesk-simulator/; specs navigate relative to it ('./?demo=1').
+    baseURL: 'http://localhost:3000/opendesk-simulator/',
     trace: 'on-first-retry',
     viewport: { width: 1280, height: 720 },
     ...devices['Desktop Chrome'],
   },
 
   webServer: {
-    command: 'pnpm run preview',
-    url: 'http://localhost:3000',
+    // Serves the production build (run `pnpm build` first).
+    command: 'pnpm exec vite preview --port 3000 --strictPort',
+    url: 'http://localhost:3000/opendesk-simulator/',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
