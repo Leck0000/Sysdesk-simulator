@@ -67,7 +67,7 @@ describe('ServicesPanel', () => {
       </Provider>
     );
     const component = screen.getByTestId('services-panel');
-    expect(component).toHaveAttribute('role', 'dialog');
+    expect(component).toHaveAttribute('role', 'region');
   });
 
   test('displays loading state initially', () => {

@@ -82,7 +82,7 @@ describe('EventViewer', () => {
       </Provider>
     );
     const component = screen.getByTestId('event-viewer');
-    expect(component).toHaveAttribute('role', 'dialog');
+    expect(component).toHaveAttribute('role', 'region');
   });
 
   test('displays loading state initially', () => {

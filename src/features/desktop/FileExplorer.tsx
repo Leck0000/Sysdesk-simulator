@@ -56,11 +56,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ windowId }) => {
         style={{
           backgroundColor: 'var(--card)',
           color: 'var(--fg)',
-          border: '1px solid var(--border)',
-          borderRadius: '4px',
           padding: '16px',
         }}
-        role="dialog"
+        role="region"
         aria-label={`File Explorer for ${machineId}`}
       >
         <p>Loading File Explorer...</p>
@@ -74,33 +72,11 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ windowId }) => {
       style={{
         backgroundColor: 'var(--card)',
         color: 'var(--fg)',
-        border: '1px solid var(--border)',
-        borderRadius: '4px',
         padding: '16px',
       }}
-      role="dialog"
+      role="region"
       aria-label={`File Explorer for ${machineId}`}
     >
-      <div
-        style={{
-          backgroundColor: 'var(--accent)',
-          color: 'var(--bg)',
-          padding: '8px 12px',
-          fontSize: '13px',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          userSelect: 'none',
-          height: '28px',
-          borderBottom: '1px solid var(--border)',
-        }}
-        role='presentation'
-      >
-        <span style={{ flexGrow: 1 }}>File Explorer</span>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {/* Control buttons would go here */}
-        </div>
-      </div>
 
       {error ? (
         <div style={{ color: 'var(--fg)', margin: '16px 0', fontSize: '12px' }}>

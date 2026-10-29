@@ -67,7 +67,7 @@ describe('ADUsersComputers', () => {
       </Provider>
     );
     const component = screen.getByTestId('ad-users-computers');
-    expect(component).toHaveAttribute('role', 'dialog');
+    expect(component).toHaveAttribute('role', 'region');
   });
 
   test('displays loading state initially', () => {

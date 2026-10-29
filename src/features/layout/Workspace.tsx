@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import { isDemoMode, DEMO_TICKETS } from '../../app/demo';
+import { isDemoMode, DEMO_SUBSYSTEMS, DEMO_TICKETS } from '../../app/demo';
 import { Toaster } from '../../shared/components/Toaster';
 import { wsConnect } from '../../shared/ws/events';
 import { TopBar } from './TopBar';
@@ -17,6 +17,7 @@ import { TicketCard } from '../tickets/TicketCard';
 import { TicketDetail } from '../tickets/TicketDetail';
 import { fetchTickets, selectFilteredQueue, selectSelectedTicket, selectTicket, setQueue } from '../tickets/slice';
 import { WindowManager } from '../desktop/WindowManager';
+import { applyStateDelta } from '../desktop/slice';
 
 export function Workspace() {
   const dispatch = useAppDispatch();
@@ -30,6 +31,9 @@ export function Workspace() {
   useEffect(() => {
     if (isDemoMode()) {
       dispatch(setQueue(DEMO_TICKETS));
+      for (const [subsystem, value] of Object.entries(DEMO_SUBSYSTEMS)) {
+        dispatch(applyStateDelta({ subsystem, op: 'set', value }));
+      }
       return;
     }
     void dispatch(fetchTickets());

@@ -50,3 +50,31 @@ export const DEMO_TICKETS: Ticket[] = [
     category: 'Mapped drive missing after login', relatedMachineId: 'ws-finance-03',
   }),
 ];
+
+/** Sample subsystem snapshots, applied as if the server sent ws state.delta. */
+export const DEMO_SUBSYSTEMS: Record<string, unknown> = {
+  services: [
+    { name: 'Spooler', displayName: 'Print Spooler', status: 'stopped', startMode: 'auto' },
+    { name: 'Dhcp', displayName: 'DHCP Client', status: 'running', startMode: 'auto' },
+    { name: 'Dnscache', displayName: 'DNS Client', status: 'running', startMode: 'auto' },
+    { name: 'LanmanWorkstation', displayName: 'Workstation', status: 'running', startMode: 'auto' },
+    { name: 'wuauserv', displayName: 'Windows Update', status: 'paused', startMode: 'manual' },
+    { name: 'W32Time', displayName: 'Windows Time', status: 'error', startMode: 'manual' },
+  ],
+  'event-log': [
+    {
+      id: '7c1e2d3f-4a5b-4c6d-8e7f-001122334401',
+      level: 'Error',
+      message: 'The Print Spooler service terminated unexpectedly.',
+      timeGenerated: hoursAgo(1),
+      eventId: '7034',
+    },
+    {
+      id: '7c1e2d3f-4a5b-4c6d-8e7f-001122334402',
+      level: 'Warning',
+      message: 'Name resolution for the name wpad timed out.',
+      timeGenerated: hoursAgo(2),
+      eventId: '1014',
+    },
+  ],
+};

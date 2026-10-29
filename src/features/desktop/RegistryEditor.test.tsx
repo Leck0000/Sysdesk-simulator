@@ -67,7 +67,7 @@ describe('RegistryEditor', () => {
       </Provider>
     );
     const component = screen.getByTestId('registry-editor');
-    expect(component).toHaveAttribute('role', 'dialog');
+    expect(component).toHaveAttribute('role', 'region');
   });
 
   test('displays loading state initially', () => {

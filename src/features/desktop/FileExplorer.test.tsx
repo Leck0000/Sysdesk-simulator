@@ -67,7 +67,7 @@ describe('FileExplorer', () => {
       </Provider>
     );
     const component = screen.getByTestId('file-explorer');
-    expect(component).toHaveAttribute('role', 'dialog');
+    expect(component).toHaveAttribute('role', 'region');
   });
 
   test('displays loading state initially', () => {

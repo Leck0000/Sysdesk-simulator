@@ -67,7 +67,7 @@ describe('NetworkPanel', () => {
       </Provider>
     );
     const component = screen.getByTestId('network-panel');
-    expect(component).toHaveAttribute('role', 'dialog');
+    expect(component).toHaveAttribute('role', 'region');
   });
 
   test('displays loading state initially', () => {
