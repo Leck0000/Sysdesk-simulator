@@ -205,6 +205,7 @@ export type ServerToClientPayload =
 
 export type ClientToServerPayload =
   | ClientAckPayload
+  | HeartbeatPayload
   | AuthenticatePayload
   | RequestMachineStatePayload
   | SendCommandPayload
@@ -231,6 +232,8 @@ export const ServerEventType = {
 
 export const ClientEventType = {
   CLIENT_ACK: 'client.ack',
+  /** heartbeat flows both ways (ARCHITECTURE.md §5.6) */
+  HEARTBEAT: 'heartbeat',
   AUTHENTICATE: 'authenticate',
   REQUEST_MACHINE_STATE: 'request_machine_state',
   SEND_COMMAND: 'send_command',

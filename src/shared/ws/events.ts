@@ -42,8 +42,6 @@ export const WSActionType = {
   
   // Sequence acknowledgment
   ACK_SENT: 'ws/ack_sent',
-  ACK_RECEIVED: 'ws/ack_received',
-  ACK_TIMEOUT: 'ws/ack_timeout',
   
   // Errors
   ERROR: 'ws/error',
@@ -100,11 +98,6 @@ export interface WSHeartbeatPayload {
 export interface WSAckPayload {
   seq: number;
   acknowledgedSeq: number;
-}
-
-export interface WSAckTimeoutPayload {
-  seq: number;
-  retries: number;
 }
 
 export interface WSErrorPayload {
@@ -176,14 +169,6 @@ export function wsHeartbeatMissed(payload: { missedCount: number }) {
 // Sequence acknowledgment
 export function wsAckSent(payload: WSAckPayload) {
   return { type: WSActionType.ACK_SENT, payload } as const;
-}
-
-export function wsAckReceived(payload: WSAckPayload) {
-  return { type: WSActionType.ACK_RECEIVED, payload } as const;
-}
-
-export function wsAckTimeout(payload: WSAckTimeoutPayload) {
-  return { type: WSActionType.ACK_TIMEOUT, payload } as const;
 }
 
 // Errors

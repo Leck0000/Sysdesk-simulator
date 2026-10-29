@@ -8,25 +8,7 @@ import { configureStore, type UnknownAction } from '@reduxjs/toolkit';
 import { wsMiddleware } from './wsMiddleware';
 import { WSClient } from '../ws/client';
 import { wsConnect, wsSend, createSendCommand, ClientEventType, WSActionType } from '../ws/events';
-
-class FakeSocket {
-  static CONNECTING = 0;
-  static OPEN = 1;
-  static CLOSING = 2;
-  static CLOSED = 3;
-  readyState = FakeSocket.OPEN;
-  binaryType = 'blob';
-  send = vi.fn();
-  close = vi.fn();
-  onopen: (() => void) | null = null;
-  onclose: ((e: unknown) => void) | null = null;
-  onerror: ((e: unknown) => void) | null = null;
-  onmessage: ((e: unknown) => void) | null = null;
-  static last: FakeSocket | null = null;
-  constructor() {
-    FakeSocket.last = this;
-  }
-}
+import { FakeSocket } from '../../test/fakeWebSocket';
 
 describe('wsMiddleware send path', () => {
   afterEach(() => {
@@ -57,5 +39,18 @@ describe('wsMiddleware send path', () => {
     expect(socket?.send).toHaveBeenCalledTimes(1);
     expect(seen.filter((t) => t === WSActionType.SEND)).toHaveLength(1);
     expect(seen).toContain(WSActionType.SENT);
+  });
+
+  it('forwards every client event type, not just send_command', () => {
+    vi.stubGlobal('WebSocket', FakeSocket);
+    const store = configureStore({
+      reducer: { auth: (state: { accessToken?: string } = {}) => state },
+      middleware: (gdm) => gdm({ serializableCheck: false }).concat(wsMiddleware),
+    });
+    store.dispatch(wsConnect({ url: 'ws://test/ws' }));
+    const ticketId = '1b84c7d2-9b0e-4527-bd82-ef0c2f5b6a1d';
+    store.dispatch(wsSend({ type: ClientEventType.ADD_TICKET_MESSAGE, payload: { ticketId, message: 'hi' } }));
+    store.dispatch(wsSend({ type: ClientEventType.CLAIM_TICKET, payload: { ticketId } }));
+    expect(FakeSocket.last?.frames().map((f) => f.t)).toEqual(['add_ticket_message', 'claim_ticket']);
   });
 });

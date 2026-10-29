@@ -3,7 +3,7 @@ import { WSClient } from '../ws/client';
 import {
   isWSAction,
   isWSMessageAction,
-  ClientEventType,
+  wsSendFailed,
   WSActionType,
   type WSConnectPayload,
   type WSSendPayload,
@@ -42,19 +42,17 @@ export const wsMiddleware: Middleware = (store) => (next) => (action) => {
 
   if (isWSAction(action) && action.type === WSActionType.SEND) {
     const { type, payload } = action.payload as WSSendPayload;
-    if (client && type === ClientEventType.SEND_COMMAND) {
-      const reportFailure = (err: unknown) => {
-        store.dispatch({
-          type: WSActionType.SEND_FAILED,
-          payload: { type, payload, error: err instanceof Error ? err.message : String(err) },
-        });
-      };
+    if (client) {
       try {
-        client.send(type, payload).catch(reportFailure);
+        client.send(type, payload);
       } catch (err) {
         // On a closed socket send() throws and has already dispatched
         // ws/send_failed itself; report anything else.
-        if (client.isConnected()) reportFailure(err);
+        if (client.isConnected()) {
+          store.dispatch(
+            wsSendFailed({ type, payload, error: err instanceof Error ? err.message : String(err) })
+          );
+        }
       }
     }
   }

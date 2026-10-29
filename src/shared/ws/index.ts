@@ -7,7 +7,7 @@ export { wsSend, wsSent, createSendCommand, ClientEventType } from './events';
 export { isClientEventType } from './envelope';
 export { wsConnect, wsConnected, wsDisconnect, wsDisconnected } from './events';
 export { wsSendFailed, wsMessage, wsHeartbeatSent, wsHeartbeatReceived } from './events';
-export { wsAckSent, wsAckReceived, wsAckTimeout, wsError } from './events';
+export { wsAckSent, wsError } from './events';
 export { isWSAction, isWSMessageAction } from './events';
 export { parseEnvelope, createEnvelope } from './envelope';
 export type { WSEnvelope, ClientToServerPayload, ServerToClientPayload } from './envelope';
