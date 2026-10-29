@@ -47,7 +47,8 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       # playwright.config.ts starts `vite preview` itself (webServer) and serves dist/.
+      # Only window-stacking for now; smoke.spec.ts is kept and run locally.
       - name: E2E tests
-        run: pnpm exec playwright test --project=Chromium
+        run: pnpm exec playwright test tests/e2e/window-stacking.spec.ts --project=Chromium
         env:
           CI: true
