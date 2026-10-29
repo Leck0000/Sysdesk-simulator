@@ -55,6 +55,9 @@ jobs:
           # Read at build time by src/app/demo.ts (import.meta.env.VITE_DEMO === '1').
           # Vite inlines it into the bundle, so it must be set on this step.
           VITE_DEMO: '1'
+          # Vite base path = /<repository name>/ so assets resolve on
+          # https://<owner>.github.io/<repository name>/ (read in vite.config.ts).
+          VITE_BASE: /${{ github.event.repository.name }}/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

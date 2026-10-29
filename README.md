@@ -13,7 +13,11 @@ pnpm build
 pnpm exec vite preview --port 3001
 ```
 
-Open `http://localhost:3001/opendesk-simulator/?demo=1` for sample data.
+Open `http://localhost:3001/?demo=1` for sample data.
+
+The base path comes from `VITE_BASE` (default `/`). To reproduce the GitHub Pages
+build locally: `VITE_BASE=/Sysdesk-simulator/ pnpm build`, then open
+`http://localhost:3001/Sysdesk-simulator/?demo=1`.
 
 Node: the version in `.nvmrc` (24.11.1). Node 20 cannot run the test suite
 (jsdom 30 depends on undici 8, which requires Node >= 22.19).
@@ -61,7 +65,9 @@ Source → GitHub Actions**. Do not select "Deploy from a branch".
 The workflow runs on pushes to `main` and on manual runs
 (**Actions → Deploy to GitHub Pages → Run workflow**). Pushing other branches
 does not publish. The build step sets `VITE_DEMO=1`, so the published site
-starts in demo mode.
+starts in demo mode. The build step also sets `VITE_BASE=/<repository name>/`
+(from `github.event.repository.name`), so the site is served at
+`https://<owner>.github.io/<repository name>/`.
 
 ## Demo Mode
 
