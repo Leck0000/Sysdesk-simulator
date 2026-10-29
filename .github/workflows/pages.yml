@@ -29,7 +29,7 @@ jobs:
         with:
           run_install: false
 
-      # Node version comes from .nvmrc. Node 20 cannot run the tests:
+      # Node version comes from .nvmrc (24). Node 20 cannot run the tests:
       # jsdom 30 -> undici 8 requires Node >= 22.19.
       - name: Setup Node
         uses: actions/setup-node@v4

@@ -19,8 +19,8 @@ The base path comes from `VITE_BASE` (default `/`). To reproduce the GitHub Page
 build locally: `VITE_BASE=/Sysdesk-simulator/ pnpm build`, then open
 `http://localhost:3001/Sysdesk-simulator/?demo=1`.
 
-Node: the version in `.nvmrc` (24.11.1). Node 20 cannot run the test suite
-(jsdom 30 depends on undici 8, which requires Node >= 22.19).
+Node: >= 22.19.0 (`engines`); CI uses Node 24 (`.nvmrc`). Node 20 cannot run the
+test suite (jsdom 30 depends on undici 8, which requires Node >= 22.19).
 
 ## TypeScript Version
 
