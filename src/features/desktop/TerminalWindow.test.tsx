@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore, type Middleware } from '@reduxjs/toolkit';
 import desktopReducer, { openAppWindow, appendTerminalOutput } from './slice';
 import wsReducer, { initialWSState } from '../../shared/ws/slice';
 import { WSActionType, ClientEventType } from '../../shared/ws/events';
 import { TerminalWindow } from './TerminalWindow';
+import { WindowManager } from './WindowManager';
 
 // xterm needs a real canvas; replace it with a recorder.
 const xterm = vi.hoisted(() => ({
@@ -70,13 +71,35 @@ describe('TerminalWindow', () => {
     xterm.instances.length = 0;
   });
 
-  it('renders a terminal region labelled with the machine and themed by CSS variables', () => {
+  it('renders the embedded Terminal component as a region labelled with the machine', () => {
     setup(false);
     const region = screen.getByRole('region', { name: 'Terminal for m1' });
-    expect(region).toBeInTheDocument();
+    expect(region).toHaveAttribute('data-testid', 'terminal');
+    expect(screen.getByTestId('terminal-window')).toContainElement(region);
+  });
+
+  it('applies CSS variable theming', () => {
+    setup(false);
     const wrapper = screen.getByTestId('terminal-window');
     expect(wrapper.style.backgroundColor).toBe('var(--bg)');
     expect(wrapper.style.color).toBe('var(--fg)');
+  });
+
+  it('opens inside window chrome: a dialog named after the window, with the terminal inside', async () => {
+    const store = configureStore({
+      reducer: { desktop: desktopReducer, ws: wsReducer },
+      preloadedState: { ws: { ...initialWSState } },
+    });
+    store.dispatch(openAppWindow({ app: 'Terminal', title: 'Terminal — m1', machineId: 'm1' }));
+    render(
+      <Provider store={store}>
+        <WindowManager />
+      </Provider>
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Terminal — m1' });
+    expect(dialog.style.backgroundColor).toBe('var(--card)');
+    expect(within(dialog).getByRole('button', { name: 'Close window' })).toBeInTheDocument();
+    expect(await within(dialog).findByRole('region', { name: 'Terminal for m1' })).toBeInTheDocument();
   });
 
   it('prints a prompt and an offline notice when not connected; does not send', () => {

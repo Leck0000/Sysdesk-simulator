@@ -159,6 +159,37 @@ export const teamSlice = createSlice({
     clearProgressStream: (state) => {
       state.progressStream = [];
     },
+
+    /** Replace the cohort roster (demo seeding; the API path uses fetchCohort). */
+    setCohort: (state, action: PayloadAction<CohortStudent[]>) => {
+      state.cohort = action.payload;
+      state.status = 'succeeded';
+      state.error = null;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchCohort.pending, (state) => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(fetchCohort.fulfilled, (state, action) => {
+        state.cohort = action.payload;
+        state.status = 'succeeded';
+      })
+      .addCase(fetchCohort.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = typeof action.payload === 'string' ? action.payload : 'Failed to fetch cohort';
+      })
+      .addCase(fetchAssignments.fulfilled, (state, action) => {
+        state.assignments = action.payload;
+      })
+      .addCase(bulkImport.fulfilled, (state, action) => {
+        state.bulkImport = action.payload;
+      })
+      .addCase(subscribeLabProgressThunk.fulfilled, (state, action) => {
+        state.progressStream = action.payload.slice(-100);
+      });
   },
 });
 
@@ -170,6 +201,7 @@ export const {
   resetBulkImport,
   addProgressEntry,
   clearProgressStream,
+  setCohort,
 } = teamSlice.actions;
 
 // Selectors

@@ -73,6 +73,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** The last Request fetch received whose URL contains `path`. */
+const lastRequest = (path: string): Request => {
+  const match = fetchMock.mock.calls.map(([req]) => req as Request).filter((r) => r.url.includes(path)).at(-1);
+  if (!match) throw new Error(`no request to ${path}`);
+  return match;
+};
+
 describe('Team API', () => {
   it('exposes all endpoints with initiate thunks', () => {
     for (const name of [
@@ -86,27 +93,98 @@ describe('Team API', () => {
     }
   });
 
-  it('createAssignmentMutation invalidates cohortQuery (Team tag)', async () => {
-    const store = makeStore();
-    const sub = store.dispatch(teamApi.endpoints.cohortQuery.initiate());
-    await sub;
-    expect(callsTo('/team/cohort')).toBe(1);
+  describe('cohortQuery', () => {
+    it('GETs /team/cohort and returns the validated roster', async () => {
+      const store = makeStore();
+      const result = await store.dispatch(teamApi.endpoints.cohortQuery.initiate());
+      expect(lastRequest('/team/cohort').method).toBe('GET');
+      expect(result.data).toEqual([]);
+    });
 
-    await store.dispatch(teamApi.endpoints.createAssignmentMutation.initiate(assignment));
-
-    await waitForCalls('/team/cohort', 2);
-    sub.unsubscribe();
+    it('provides the Team tag (a createAssignment mutation refetches it)', async () => {
+      const store = makeStore();
+      const sub = store.dispatch(teamApi.endpoints.cohortQuery.initiate());
+      await sub;
+      expect(callsTo('/team/cohort')).toBe(1);
+      await store.dispatch(teamApi.endpoints.createAssignmentMutation.initiate(assignment));
+      await waitForCalls('/team/cohort', 2);
+      sub.unsubscribe();
+    });
   });
 
-  it('bulkImportMutation invalidates assignmentsQuery (Team tag)', async () => {
-    const store = makeStore();
-    const sub = store.dispatch(teamApi.endpoints.assignmentsQuery.initiate('cohort-1'));
-    await sub;
-    expect(callsTo('/team/assignments')).toBe(1);
+  describe('assignmentsQuery', () => {
+    it('sends the cohortId parameter in the query string', async () => {
+      const store = makeStore();
+      await store.dispatch(teamApi.endpoints.assignmentsQuery.initiate('cohort-1'));
+      const req = lastRequest('/team/assignments');
+      expect(req.method).toBe('GET');
+      expect(new URL(req.url).searchParams.get('cohortId')).toBe('cohort-1');
+    });
 
-    await store.dispatch(teamApi.endpoints.bulkImportMutation.initiate(new FormData()));
+    it('provides the Team tag (a bulkImport mutation refetches it)', async () => {
+      const store = makeStore();
+      const sub = store.dispatch(teamApi.endpoints.assignmentsQuery.initiate('cohort-1'));
+      await sub;
+      expect(callsTo('/team/assignments')).toBe(1);
+      await store.dispatch(teamApi.endpoints.bulkImportMutation.initiate(new FormData()));
+      await waitForCalls('/team/assignments', 2);
+      sub.unsubscribe();
+    });
+  });
 
-    await waitForCalls('/team/assignments', 2);
-    sub.unsubscribe();
+  describe('createAssignmentMutation', () => {
+    it('is a mutation: POSTs the assignment body to /team/assignments', async () => {
+      const store = makeStore();
+      const result = await store.dispatch(teamApi.endpoints.createAssignmentMutation.initiate(assignment));
+      const req = lastRequest('/team/assignments');
+      expect(req.method).toBe('POST');
+      expect(await req.clone().json()).toEqual(assignment);
+      expect(result.data).toEqual(assignment);
+    });
+
+    it('invalidates the Team tag on completion (assignmentsQuery refetches)', async () => {
+      const store = makeStore();
+      const sub = store.dispatch(teamApi.endpoints.assignmentsQuery.initiate('cohort-1'));
+      await sub;
+      await store.dispatch(teamApi.endpoints.createAssignmentMutation.initiate(assignment));
+      await vi.waitFor(() =>
+        expect(fetchMock.mock.calls.filter(([r]) => (r as Request).method === 'GET' && (r as Request).url.includes('/team/assignments')).length).toBe(2)
+      );
+      sub.unsubscribe();
+    });
+  });
+
+  describe('bulkImportMutation', () => {
+    it('accepts FormData and POSTs it as multipart to /team/bulk-import', async () => {
+      const store = makeStore();
+      const form = new FormData();
+      form.append('cohortId', 'cohort-1');
+      const result = await store.dispatch(teamApi.endpoints.bulkImportMutation.initiate(form));
+      const req = lastRequest('/team/bulk-import');
+      expect(req.method).toBe('POST');
+      expect(req.headers.get('content-type') ?? '').toMatch(/^multipart\/form-data/);
+      expect((await req.clone().formData()).get('cohortId')).toBe('cohort-1');
+      expect(result.data).toEqual({ success: true, imported: 1, failed: 0, errors: [] });
+    });
+
+    it('invalidates the Team tag on completion (cohortQuery refetches)', async () => {
+      const store = makeStore();
+      const sub = store.dispatch(teamApi.endpoints.cohortQuery.initiate());
+      await sub;
+      await store.dispatch(teamApi.endpoints.bulkImportMutation.initiate(new FormData()));
+      await waitForCalls('/team/cohort', 2);
+      sub.unsubscribe();
+    });
+  });
+
+  describe('subscribeLabProgress', () => {
+    it('is a query endpoint: GETs lab progress for the labId', async () => {
+      const store = makeStore();
+      const result = await store.dispatch(teamApi.endpoints.subscribeLabProgress.initiate('lab-7'));
+      const req = lastRequest('/team/lab-progress');
+      expect(req.method).toBe('GET');
+      expect(new URL(req.url).searchParams.get('labId')).toBe('lab-7');
+      expect(result.data).toEqual([]);
+    });
   });
 });

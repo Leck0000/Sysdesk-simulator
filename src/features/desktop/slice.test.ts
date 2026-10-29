@@ -61,21 +61,56 @@ describe('desktop slice', () => {
     });
   });
 
-  describe('removeWindow / closeWindow', () => {
-    for (const [name, action] of [
-      ['removeWindow', removeWindow],
-      ['closeWindow', closeWindow],
-    ] as const) {
-      it(`${name} removes the window, its zOrder entry and active id`, () => {
-        let state = add(add(init(), 'Test1'), 'Test2', 300, 200);
-        const id = win(state).id;
-        state = reducer(state, activateWindow(id));
-        state = reducer(state, action(id));
-        expect(state.windows.map((w) => w.title)).toEqual(['Test2']);
-        expect(state.zOrder.some((z) => z.windowId === id)).toBe(false);
-        expect(state.activeWindowId).toBeUndefined();
-      });
-    }
+  describe('removeWindow', () => {
+    const setup = () => {
+      const state = add(add(init(), 'Test1'), 'Test2', 300, 200);
+      return { state, id: win(state).id };
+    };
+
+    it('removes a window from the desktop', () => {
+      const { state, id } = setup();
+      const next = reducer(state, removeWindow(id));
+      expect(next.windows.map((w) => w.title)).toEqual(['Test2']);
+    });
+
+    it('removes window from zOrder', () => {
+      const { state, id } = setup();
+      const next = reducer(state, removeWindow(id));
+      expect(next.zOrder.some((z) => z.windowId === id)).toBe(false);
+      expect(next.zOrder).toHaveLength(1);
+    });
+
+    it('clears activeWindowId if removed window was active', () => {
+      const { state, id } = setup();
+      const next = reducer(reducer(state, activateWindow(id)), removeWindow(id));
+      expect(next.activeWindowId).toBeUndefined();
+    });
+  });
+
+  describe('closeWindow', () => {
+    const setup = () => {
+      const state = add(add(init(), 'Test1'), 'Test2', 300, 200);
+      return { state, id: win(state).id };
+    };
+
+    it('closes a window', () => {
+      const { state, id } = setup();
+      const next = reducer(state, closeWindow(id));
+      expect(next.windows.map((w) => w.title)).toEqual(['Test2']);
+    });
+
+    it('removes window from zOrder', () => {
+      const { state, id } = setup();
+      const next = reducer(state, closeWindow(id));
+      expect(next.zOrder.some((z) => z.windowId === id)).toBe(false);
+      expect(next.zOrder).toHaveLength(1);
+    });
+
+    it('clears activeWindowId if closed window was active', () => {
+      const { state, id } = setup();
+      const next = reducer(reducer(state, activateWindow(id)), closeWindow(id));
+      expect(next.activeWindowId).toBeUndefined();
+    });
   });
 
   it('updateWindow updates properties and zIndex', () => {
@@ -115,17 +150,36 @@ describe('desktop slice', () => {
     expect(state.activeWindowId).toBe(a);
   });
 
-  it('minimize / maximize / toggle update flags and state', () => {
-    let state = add(init(), 'Test');
-    const id = win(state).id;
-    state = reducer(state, minimizeWindow(id));
-    expect(win(state)).toMatchObject({ minimized: true, maximized: false, state: 'minimized' });
-    state = reducer(state, maximizeWindow(id));
-    expect(win(state)).toMatchObject({ minimized: false, maximized: true, state: 'maximized' });
-    state = reducer(state, toggleWindowState(id));
-    expect(win(state)).toMatchObject({ maximized: false, state: 'normal' });
-    state = reducer(state, toggleWindowState(id));
-    expect(win(state)).toMatchObject({ maximized: true, state: 'maximized' });
+  describe('minimizeWindow', () => {
+    it('minimizes a window', () => {
+      let state = add(init(), 'Test');
+      state = reducer(state, minimizeWindow(win(state).id));
+      expect(win(state)).toMatchObject({ minimized: true, maximized: false, state: 'minimized' });
+    });
+  });
+
+  describe('maximizeWindow', () => {
+    it('maximizes a window and keeps its stored bounds for restore', () => {
+      let state = add(init(), 'Test');
+      state = reducer(state, maximizeWindow(win(state).id));
+      expect(win(state)).toMatchObject({ minimized: false, maximized: true, state: 'maximized' });
+      expect(win(state)).toMatchObject({ innerWidth: 400, innerHeight: 300 });
+    });
+  });
+
+  describe('toggleWindowState', () => {
+    it('toggles from normal to maximized', () => {
+      let state = add(init(), 'Test');
+      state = reducer(state, toggleWindowState(win(state).id));
+      expect(win(state)).toMatchObject({ maximized: true, state: 'maximized' });
+    });
+
+    it('toggles from maximized to normal', () => {
+      let state = add(init(), 'Test');
+      const id = win(state).id;
+      state = reducer(reducer(state, maximizeWindow(id)), toggleWindowState(id));
+      expect(win(state)).toMatchObject({ maximized: false, state: 'normal' });
+    });
   });
 
   it('setWindowBounds sets position and size', () => {

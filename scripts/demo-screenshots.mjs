@@ -3,7 +3,7 @@
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 
-const BASE = 'http://localhost:3001/opendesk-simulator/';
+const BASE = `http://localhost:3001${process.env.VITE_BASE ?? '/'}`;
 const OUT = process.argv[2] ?? 'screenshots';
 const PREFIX = process.argv[3] ?? '';
 fs.mkdirSync(OUT, { recursive: true });

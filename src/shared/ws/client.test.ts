@@ -52,18 +52,27 @@ describe('WSClient', () => {
   });
 
   describe('envelopes and event types', () => {
-    it('parses a valid envelope and rejects invalid ones', () => {
+    it('parses a valid envelope', () => {
       const parsed = parseEnvelope(createEnvelope(ClientEventType.CLIENT_ACK, { seq: 1 }, SESSION_ID, 1));
       expect(parsed?.t).toBe('client.ack');
       expect(parsed?.seq).toBe(1);
+    });
+
+    it('returns null for a non-envelope object', () => {
       expect(parseEnvelope({})).toBeNull();
+    });
+
+    it('returns null when required fields are missing', () => {
       expect(parseEnvelope({ v: 0 })).toBeNull();
     });
 
-    it('defines the protocol event names, with heartbeat in both directions', () => {
+    it('defines the server event names', () => {
       expect(ServerEventType.SESSION_INIT).toBe('session.init');
       expect(ServerEventType.HEARTBEAT).toBe('heartbeat');
       expect(ServerEventType.CMD_RESULT).toBe('cmd.result');
+    });
+
+    it('defines the client event names, with heartbeat in both directions', () => {
       expect(ClientEventType.CLIENT_ACK).toBe('client.ack');
       expect(ClientEventType.AUTHENTICATE).toBe('authenticate');
       expect(ClientEventType.SEND_COMMAND).toBe('send_command');
@@ -146,6 +155,15 @@ describe('WSClient', () => {
       const socket = connect();
       vi.advanceTimersByTime(1_000);
       expect(socket.frames().filter((f) => f.t === 'heartbeat')).toHaveLength(1);
+    });
+
+    it('stops sending heartbeats after disconnect', () => {
+      const socket = connect();
+      client.disconnect();
+      socket.send.mockClear();
+      vi.advanceTimersByTime(5_000);
+      expect(socket.frames().filter((f) => f.t === 'heartbeat')).toHaveLength(0);
+      expect(client.readyState).toBe(WebSocket.CLOSED);
     });
 
     it('a server heartbeat resets the missed count', () => {
