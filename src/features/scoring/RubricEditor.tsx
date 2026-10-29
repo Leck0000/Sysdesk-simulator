@@ -43,7 +43,7 @@ const RubricDslSchema = z.object({
 
 type RubricDsl = z.infer<typeof RubricDslSchema>;
 
-// ---------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------
 // RubricEditor component — instructor-only
  *
  * Features:
