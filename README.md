@@ -46,6 +46,20 @@ src/
 └── test/             # vitest setup, jest-dom types
 ```
 
+## Deploying to GitHub Pages
+
+Deployment is done by the Actions workflow `.github/workflows/pages.yml`
+(`actions/upload-pages-artifact` + `actions/deploy-pages`). It does not use a
+`gh-pages` branch and nothing is committed to `dist/`.
+
+One-time repository setting: **Settings → Pages → Build and deployment →
+Source → GitHub Actions**. Do not select "Deploy from a branch".
+
+The workflow runs on pushes to `main` and on manual runs
+(**Actions → Deploy to GitHub Pages → Run workflow**). Pushing other branches
+does not publish. The build step sets `VITE_DEMO=1`, so the published site
+starts in demo mode.
+
 ## Demo Mode
 
 Add `?demo=1` to the URL (or set `VITE_DEMO=1`) to seed:

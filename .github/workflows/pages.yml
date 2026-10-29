@@ -1,8 +1,10 @@
 name: Deploy to GitHub Pages
 
 on:
+  # Publish only from main (or a manual run). Pushing feature branches such as
+  # fix/wire-up-app must not deploy.
   push:
-    branches: [main, fix/wire-up-app]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -47,6 +49,10 @@ jobs:
 
       - name: Build
         run: pnpm build
+        env:
+          # Read at build time by src/app/demo.ts (import.meta.env.VITE_DEMO === '1').
+          # Vite inlines it into the bundle, so it must be set on this step.
+          VITE_DEMO: '1'
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
